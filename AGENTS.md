@@ -6,7 +6,7 @@
 
 - **Build System**: Bazel 8.5.0 with Bzlmod
 - **Language**: Kotlin 2.2.x targeting JDK 21
-- **Linting**: ktlint (integrated via rules_kotlin aspect)
+- **Linting**: ktlint (via ktlint_test rules)
 
 ## Build Commands
 
@@ -29,7 +29,7 @@ bazel clean --expunge
 
 ## Code Style
 
-- Follow ktlint rules (enforced via Bazel aspect)
+- Follow ktlint rules (enforced via ktlint_test targets)
 - 4-space indentation
 - Max line length: 120 characters
 - Use explicit API mode for public APIs
@@ -55,8 +55,25 @@ deps = ["@maven//:group_artifact"]
 ## Creating New Modules
 
 1. Create directory: `mkdir -p newmodule/src/main/kotlin/com/didrikquant/newmodule`
-2. Add `BUILD.bazel` with `kt_jvm_library` target
+2. Add `BUILD.bazel` with `kt_jvm_library` and `ktlint_test` targets
 3. Add Kotlin source files
+
+Example BUILD.bazel for a new module:
+```python
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_test")
+
+kt_jvm_library(
+    name = "mymodule",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+)
+
+ktlint_test(
+    name = "ktlint",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+)
+```
 
 ## Project Structure
 

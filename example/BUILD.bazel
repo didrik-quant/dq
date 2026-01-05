@@ -1,6 +1,7 @@
 """Example Kotlin library demonstrating the build setup."""
 
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_test")
 
 kt_jvm_library(
     name = "example",
@@ -10,4 +11,10 @@ kt_jvm_library(
         # Add dependencies here, e.g.:
         # "@maven//:org_jetbrains_kotlinx_kotlinx_coroutines_core",
     ],
+)
+
+ktlint_test(
+    name = "ktlint",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    tags = ["ktlint"],
 )

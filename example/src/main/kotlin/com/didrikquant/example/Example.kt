@@ -12,9 +12,7 @@ public class Example {
      * @param name The name to greet.
      * @return A greeting string.
      */
-    public fun greet(name: String): String {
-        return "Hello, $name! Welcome to Didrik Quant."
-    }
+    public fun greet(name: String): String = "Hello, $name! Welcome to Didrik Quant."
 
     public companion object {
         /**
