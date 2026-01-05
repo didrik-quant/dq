@@ -1,0 +1,31 @@
+"""dq - Didrik Quant Monorepo
+
+A Kotlin monorepo for financial applications.
+"""
+
+module(
+    name = "dq",
+    version = "0.0.1",
+)
+
+# Bazel rules
+bazel_dep(name = "rules_java", version = "8.6.4")
+bazel_dep(name = "rules_kotlin", version = "2.2.2")
+bazel_dep(name = "rules_jvm_external", version = "6.9")
+
+# Configure Kotlin toolchain
+register_toolchains("//:kotlin_toolchain")
+
+# Maven dependencies
+maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
+maven.install(
+    artifacts = [
+        # Add your Maven dependencies here
+        # Example: "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0",
+    ],
+    repositories = [
+        "https://repo1.maven.org/maven2",
+    ],
+    lock_file = "//:maven_install.json",
+)
+use_repo(maven, "maven")

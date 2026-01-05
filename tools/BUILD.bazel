@@ -1,0 +1,9 @@
+"""Build tools and utilities."""
+
+# ktlint is integrated via rules_kotlin's built-in aspect
+# See .bazelrc for ktlint_aspect configuration
+#
+# To run ktlint on all Kotlin targets:
+#   bazel build //...
+#
+# ktlint violations will appear as build warnings/errors

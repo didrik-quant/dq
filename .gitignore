@@ -1,0 +1,42 @@
+# Bazel
+bazel-*
+.bazelrc.user
+
+# Maven lock file (generated, but we'll track it)
+# maven_install.json
+
+# IDE - IntelliJ IDEA
+.idea/
+*.iml
+*.ipr
+*.iws
+out/
+
+# IDE - VS Code
+.vscode/
+*.code-workspace
+
+# IDE - Eclipse
+.classpath
+.project
+.settings/
+bin/
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Kotlin
+*.class
+*.jar
+*.log
+
+# Local environment
+.env
+.env.local
+*.local

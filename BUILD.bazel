@@ -1,0 +1,20 @@
+"""Root BUILD file for dq monorepo."""
+
+load("@rules_kotlin//kotlin:core.bzl", "define_kt_toolchain", "kt_kotlinc_options")
+
+# Kotlin compiler options
+kt_kotlinc_options(
+    name = "kt_kotlinc_options",
+    jvm_target = "21",
+    warn = "error",
+    x_explicit_api_mode = "warning",
+)
+
+# Define the Kotlin toolchain
+define_kt_toolchain(
+    name = "kotlin_toolchain",
+    api_version = "2.2",
+    jvm_target = "21",
+    kotlinc_options = "//:kt_kotlinc_options",
+    language_version = "2.2",
+)
