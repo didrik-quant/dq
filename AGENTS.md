@@ -82,6 +82,72 @@ dq/
 ├── MODULE.bazel      # Bzlmod dependencies
 ├── BUILD.bazel       # Root build + Kotlin toolchain
 ├── .bazelrc          # Bazel configuration
+├── bot/              # Main MM bot application
+├── core/             # Core domain types (Event, Command, OrderBook)
+├── strategy/         # Trading strategies (SimpleMarketMaker)
+├── execution/        # Order management
+├── risk/             # Risk checking and kill switch
+├── kraken-client/    # Kraken Futures API client
+├── replay/           # Traffic recording and replay system
+├── backtest/         # Regression testing framework
 ├── example/          # Example module
 └── tools/            # Build tooling
 ```
+
+## Regression Testing
+
+**IMPORTANT**: Before deploying changes to the strategy or pipeline components, always run the regression tests.
+
+```bash
+# Run regression tests against recorded market data
+bazel test //backtest:regression_test --test_tag_filters=regression
+```
+
+### When to Run Regression Tests
+
+Run regression tests before modifying:
+- Any file in `strategy/`
+- Any handler in `bot/src/main/kotlin/.../handlers/`
+- `core/` event types or order book logic
+- `execution/` order management
+- `risk/` configuration or checks
+
+### Test Data
+
+Tests replay recorded market data from the live bot. Data is stored in Chronicle Queue format at `~/.dq/recordings`.
+
+- **Retention**: 30 days rolling window
+- **Recording**: Always-on during live bot operation
+- **Bootstrap**: Tests will be skipped if no data is available yet (data accumulates over time)
+
+### Environment Variables
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `REPLAY_DATA_DIR` | Directory for recorded events | `~/.dq/recordings` |
+| `REPLAY_RETENTION_DAYS` | Days to retain recordings | `30` |
+| `BACKTEST_START_DAYS` | Days ago to start backtest | `7` |
+| `BACKTEST_END_DAYS` | Days ago to end backtest | `1` |
+| `BACKTEST_SYMBOL` | Symbol to backtest | `PF_XRPUSD` |
+
+### CI Integration
+
+The regression tests are tagged and can run separately:
+
+```bash
+# Run all tests EXCEPT regression
+bazel test //... --test_tag_filters=-regression
+
+# Run ONLY regression tests
+bazel test //backtest:regression_test --test_tag_filters=regression
+```
+
+### Traffic Replay Architecture
+
+The replay system has three main components:
+
+1. **Recording** (`replay/recorder/`): Always-on event capture during live trading
+2. **Replay** (`replay/player/`): Fast playback of recorded events
+3. **Simulation** (`replay/simulator/`): Conservative fill model for testing
+
+The simulation uses a simple trade-through model (fills when price crosses your level) which is intentionally conservative - real performance should be better.

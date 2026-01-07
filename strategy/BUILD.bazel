@@ -1,0 +1,16 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_test")
+
+kt_jvm_library(
+    name = "strategy",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//core",
+    ],
+)
+
+ktlint_test(
+    name = "ktlint",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+)

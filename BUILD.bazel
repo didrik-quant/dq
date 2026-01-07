@@ -1,6 +1,7 @@
 """Root BUILD file for dq monorepo."""
 
-load("@rules_kotlin//kotlin:core.bzl", "define_kt_toolchain", "kt_kotlinc_options")
+load("@rules_kotlin//kotlin:core.bzl", "define_kt_toolchain", "kt_compiler_plugin", "kt_kotlinc_options")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
 
 # Kotlin compiler options
 kt_kotlinc_options(
@@ -17,4 +18,26 @@ define_kt_toolchain(
     jvm_target = "21",
     kotlinc_options = "//:kt_kotlinc_options",
     language_version = "2.2",
+)
+
+# Kotlinx Serialization compiler plugin
+kt_compiler_plugin(
+    name = "serialization_plugin",
+    compile_phase = True,
+    id = "org.jetbrains.kotlin.serialization",
+    stubs_phase = True,
+    deps = [
+        "@rules_kotlin//kotlin/compiler:kotlinx-serialization-compiler-plugin",
+    ],
+)
+
+# Kotlinx Serialization library with compiler plugin - depend on this for serialization support
+kt_jvm_library(
+    name = "kotlin_serialization",
+    srcs = [],
+    exported_compiler_plugins = [":serialization_plugin"],
+    visibility = ["//visibility:public"],
+    exports = [
+        "@maven//:org_jetbrains_kotlinx_kotlinx_serialization_json_jvm",
+    ],
 )

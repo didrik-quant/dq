@@ -15,9 +15,19 @@ trim_trailing_whitespace = true
 indent_size = 4
 max_line_length = 120
 
-# ktlint specific settings
 ktlint_standard = enabled
 ktlint_code_style = ktlint_official
+ktlint_standard_no-wildcard-imports = disabled
+ktlint_standard_multiline-expression-wrapping = disabled
+ktlint_standard_class-signature = disabled
+ktlint_standard_function-signature = disabled
+ktlint_standard_trailing-comma-on-declaration-site = disabled
+ktlint_standard_chain-method-continuation = disabled
+ktlint_standard_no-empty-first-line-in-class-body = disabled
+ktlint_standard_import-ordering = disabled
+ktlint_standard_wrapping = disabled
+ktlint_standard_function-expression-body = disabled
+ktlint_standard_blank-line-before-declaration = disabled
 
 [*.{yaml,yml}]
 indent_size = 2

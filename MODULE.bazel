@@ -20,12 +20,34 @@ register_toolchains("//:kotlin_toolchain")
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
     artifacts = [
-        # Add your Maven dependencies here
-        # Example: "org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0",
+        "com.lmax:disruptor:4.0.0",
+        "io.ktor:ktor-client-core-jvm:2.3.12",
+        "io.ktor:ktor-client-cio-jvm:2.3.12",
+        "io.ktor:ktor-client-websockets-jvm:2.3.12",
+        "io.ktor:ktor-client-content-negotiation-jvm:2.3.12",
+        "io.ktor:ktor-serialization-kotlinx-json-jvm:2.3.12",
+        "org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.7.3",
+        "org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.9.0",
+        "io.github.microutils:kotlin-logging-jvm:3.0.5",
+        "ch.qos.logback:logback-classic:1.5.6",
+
+
+
+        # ZSTD compression for recorded events
+        "com.github.luben:zstd-jni:1.5.6-9",
+
+        # JUnit 5 for regression tests
+        "org.junit.jupiter:junit-jupiter-api:5.10.2",
+        "org.junit.jupiter:junit-jupiter-engine:5.10.2",
+        "org.junit.jupiter:junit-jupiter-params:5.10.2",
+        "org.junit.platform:junit-platform-console:1.10.2",
+        "org.junit.platform:junit-platform-launcher:1.10.2",
+
+        # Kotlin test
+        "org.jetbrains.kotlin:kotlin-test:2.0.21",
     ],
     repositories = [
         "https://repo1.maven.org/maven2",
     ],
-    lock_file = "//:maven_install.json",
 )
 use_repo(maven, "maven")
