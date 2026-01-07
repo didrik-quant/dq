@@ -15,7 +15,9 @@ import com.didrikquant.replay.recorder.EventRecorder
 import com.didrikquant.replay.recorder.RecorderConfig
 import com.didrikquant.risk.KillSwitch
 import com.didrikquant.risk.RiskChecker
+import com.didrikquant.strategy.AgentXrpStrategy
 import com.didrikquant.strategy.SimpleMarketMaker
+import com.didrikquant.strategy.Strategy
 import com.lmax.disruptor.dsl.Disruptor
 import mu.KotlinLogging
 
@@ -28,12 +30,7 @@ public class Pipeline(
     public val orderManager: OrderManager = OrderManager(config.symbol)
     public val killSwitch: KillSwitch = KillSwitch(config.riskConfig)
 
-    private val strategy =
-        SimpleMarketMaker(
-            spreadBps = config.spreadBps,
-            orderSize = config.orderSize,
-            tickSize = config.tickSize,
-        )
+    private val strategy: Strategy = createStrategy(config)
     private val riskChecker = RiskChecker(config.riskConfig)
 
     public lateinit var bookHandler: BookHandler
@@ -109,5 +106,24 @@ public class Pipeline(
 
     public fun cleanupOldRecordings() {
         eventRecorder?.cleanup()
+    }
+
+    private companion object {
+        fun createStrategy(config: BotConfig): Strategy =
+            when (config.strategyClass) {
+                "SimpleMarketMaker" ->
+                    SimpleMarketMaker(
+                        spreadBps = config.spreadBps,
+                        orderSize = config.orderSize,
+                        tickSize = config.tickSize,
+                    )
+                "AgentXrpStrategy" ->
+                    AgentXrpStrategy(
+                        spreadBps = config.spreadBps,
+                        orderSize = config.orderSize,
+                        tickSize = config.tickSize,
+                    )
+                else -> error("Unknown strategy class: ${config.strategyClass}")
+            }
     }
 }

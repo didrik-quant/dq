@@ -84,70 +84,77 @@ dq/
 ├── .bazelrc          # Bazel configuration
 ├── bot/              # Main MM bot application
 ├── core/             # Core domain types (Event, Command, OrderBook)
-├── strategy/         # Trading strategies (SimpleMarketMaker)
+├── strategy/         # Trading strategies (AgentXrpStrategy, SimpleMarketMaker)
 ├── execution/        # Order management
 ├── risk/             # Risk checking and kill switch
 ├── kraken-client/    # Kraken Futures API client
-├── replay/           # Traffic recording and replay system
-├── backtest/         # Regression testing framework
+├── replay/           # Traffic recording for analysis
+├── cli/              # CLI tools (dq fills, dq book)
+├── harness/          # Epoch-based evolution harness
+├── agents/           # Per-instrument evolution logs
 ├── example/          # Example module
 └── tools/            # Build tooling
 ```
 
-## Regression Testing
+## Epoch-Based Strategy Evolution
 
-**IMPORTANT**: Before deploying changes to the strategy or pipeline components, always run the regression tests.
+The harness (`//harness:harness`) orchestrates strategy evolution through live trading epochs.
+
+### Workflow
+
+1. **Harness creates a git worktree** for isolation
+2. **Agent receives a prompt** to improve the strategy
+3. **Agent modifies** `strategy/src/main/kotlin/.../AgentXrpStrategy.kt`
+4. **Agent runs** `bazel build //...` to verify changes compile
+5. **Harness runs the bot** live for the epoch duration
+6. **Results are logged** to `agents/<instrument>/evolution.md`
+7. **Changes are merged** back to main (if successful)
+8. **Loop repeats**
+
+### Important Files
+
+| File | Purpose |
+|------|---------|
+| `strategy/.../AgentXrpStrategy.kt` | Strategy code to evolve |
+| `agents/PF_XRPUSD/evolution.md` | History of changes and results |
+
+### CLI Tools
 
 ```bash
-# Run regression tests against recorded market data
-bazel test //backtest:regression_test --test_tag_filters=regression
+# View fills from last epoch
+dq fills
+
+# View order book at a specific timestamp
+dq book --at <timestamp_ms>
 ```
 
-### When to Run Regression Tests
+### Configuration
 
-Run regression tests before modifying:
-- Any file in `strategy/`
-- Any handler in `bot/src/main/kotlin/.../handlers/`
-- `core/` event types or order book logic
-- `execution/` order management
-- `risk/` configuration or checks
-
-### Test Data
-
-Tests replay recorded market data from the live bot. Data is stored in Chronicle Queue format at `~/.dq/recordings`.
-
-- **Retention**: 30 days rolling window
-- **Recording**: Always-on during live bot operation
-- **Bootstrap**: Tests will be skipped if no data is available yet (data accumulates over time)
-
-### Environment Variables
+Set in `~/.dq/harness.env`:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `REPLAY_DATA_DIR` | Directory for recorded events | `~/.dq/recordings` |
-| `REPLAY_RETENTION_DAYS` | Days to retain recordings | `30` |
-| `BACKTEST_START_DAYS` | Days ago to start backtest | `7` |
-| `BACKTEST_END_DAYS` | Days ago to end backtest | `1` |
-| `BACKTEST_SYMBOL` | Symbol to backtest | `PF_XRPUSD` |
+| `HARNESS_REPO_ROOT` | Path to dq repo | (required) |
+| `HARNESS_INSTRUMENT` | Trading instrument | `PF_XRPUSD` |
+| `HARNESS_EPOCH_DURATION_MS` | Epoch duration in ms | `3600000` (1 hour) |
+| `HARNESS_STRATEGY_CLASS` | Strategy class name | `AgentXrpStrategy` |
+| `OPENCODE_MODEL` | LLM model to use | `anthropic/claude-opus-4-5` |
+| `KRAKEN_API_KEY` | Kraken API key | (required) |
+| `KRAKEN_API_SECRET` | Kraken API secret | (required) |
 
-### CI Integration
-
-The regression tests are tagged and can run separately:
+### Running the Harness
 
 ```bash
-# Run all tests EXCEPT regression
-bazel test //... --test_tag_filters=-regression
+# Terminal 1: Start opencode server
+opencode serve --port 4096
 
-# Run ONLY regression tests
-bazel test //backtest:regression_test --test_tag_filters=regression
+# Terminal 2: Run harness
+bazel run //harness:harness
 ```
 
-### Traffic Replay Architecture
+### Traffic Recording
 
-The replay system has three main components:
+Events are recorded during live trading to `~/.dq/recordings` for analysis via CLI tools.
 
-1. **Recording** (`replay/recorder/`): Always-on event capture during live trading
-2. **Replay** (`replay/player/`): Fast playback of recorded events
-3. **Simulation** (`replay/simulator/`): Conservative fill model for testing
-
-The simulation uses a simple trade-through model (fills when price crosses your level) which is intentionally conservative - real performance should be better.
+- **Retention**: 30 days rolling window
+- **Format**: Chronicle Queue with ZSTD compression

@@ -1,0 +1,28 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library", "kt_jvm_binary")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_test")
+
+kt_jvm_library(
+    name = "harness_lib",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//kraken-client",
+        "@maven//:io_github_microutils_kotlin_logging_jvm",
+        "@maven//:org_jetbrains_kotlinx_kotlinx_coroutines_core_jvm",
+        "@maven//:org_jetbrains_kotlinx_kotlinx_serialization_json_jvm",
+    ],
+)
+
+kt_jvm_binary(
+    name = "harness",
+    main_class = "com.didrikquant.harness.MainKt",
+    runtime_deps = [
+        ":harness_lib",
+        "@maven//:ch_qos_logback_logback_classic",
+    ],
+)
+
+ktlint_test(
+    name = "ktlint",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+)

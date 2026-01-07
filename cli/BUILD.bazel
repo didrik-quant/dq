@@ -1,0 +1,26 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library", "kt_jvm_binary")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_test")
+
+kt_jvm_library(
+    name = "cli_lib",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+    deps = [
+        "//core",
+        "//replay",
+    ],
+)
+
+kt_jvm_binary(
+    name = "dq",
+    main_class = "com.didrikquant.cli.MainKt",
+    runtime_deps = [
+        ":cli_lib",
+        "@maven//:ch_qos_logback_logback_classic",
+    ],
+)
+
+ktlint_test(
+    name = "ktlint",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+)

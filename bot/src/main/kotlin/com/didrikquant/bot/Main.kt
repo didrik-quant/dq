@@ -21,13 +21,14 @@ private val logger = KotlinLogging.logger {}
 
 public fun main(args: Array<String>): Unit =
     runBlocking {
-        val dryRun = args.contains("--dry-run")
+        val parsedArgs = parseArgs(args)
+        val dryRun = parsedArgs.dryRun
 
         logger.info {
-            if (dryRun) {
-                "Starting Kraken Futures HFT Market Maker [DRY-RUN MODE]"
-            } else {
-                "Starting Kraken Futures HFT Market Maker"
+            buildString {
+                append("Starting Kraken Futures HFT Market Maker")
+                if (dryRun) append(" [DRY-RUN MODE]")
+                parsedArgs.epochDurationMs?.let { append(" [EPOCH: ${it}ms]") }
             }
         }
 
@@ -40,24 +41,21 @@ public fun main(args: Array<String>): Unit =
 
         val botConfig =
             BotConfig(
-                symbol = "PF_XRPUSD",
+                symbol = parsedArgs.symbol,
                 spreadBps = 10,
                 orderSize = BigDecimal("10"),
                 requoteIntervalMs = 2000,
                 dryRun = dryRun,
+                epochDurationMs = parsedArgs.epochDurationMs,
+                strategyClass = parsedArgs.strategyClass,
             )
 
-        logger.info { "Config: symbol=${botConfig.symbol}, spread=${botConfig.spreadBps}bps, size=${botConfig.orderSize}" }
+        logger.info { "Config: symbol=${botConfig.symbol}, strategy=${botConfig.strategyClass}" }
 
         val recorderConfig = RecorderConfig.fromEnv()
         logger.info { "Recording to: ${recorderConfig.dataDir}" }
 
-        val restClient: KrakenRestClient? =
-            if (dryRun) {
-                null
-            } else {
-                KrakenRestClient(krakenConfig)
-            }
+        val restClient: KrakenRestClient? = if (dryRun) null else KrakenRestClient(krakenConfig)
 
         if (!dryRun && restClient != null) {
             logger.info { "Fetching account info..." }
@@ -87,6 +85,8 @@ public fun main(args: Array<String>): Unit =
         privateWs?.connect(scope)
 
         logger.info { "Futures WebSocket connections initiated" }
+
+        val startTimeMs = System.currentTimeMillis()
 
         Runtime.getRuntime().addShutdownHook(
             Thread {
@@ -133,13 +133,14 @@ public fun main(args: Array<String>): Unit =
             }
         }
 
-        logger.info {
-            if (dryRun) {
-                "Futures MM Bot running in DRY-RUN mode (no orders will be placed). Press Ctrl+C to stop."
-            } else {
-                "Futures MM Bot running. Press Ctrl+C to stop."
+        val runMessage =
+            buildString {
+                append("Futures MM Bot running")
+                if (dryRun) append(" in DRY-RUN mode (no orders will be placed)")
+                botConfig.epochDurationMs?.let { append(". Will shutdown after ${it / 1000}s") }
+                append(". Press Ctrl+C to stop.")
             }
-        }
+        logger.info { runMessage }
 
         while (scope.isActive) {
             delay(1000)
@@ -151,5 +152,53 @@ public fun main(args: Array<String>): Unit =
                 }
                 break
             }
+
+            botConfig.epochDurationMs?.let { epochMs ->
+                val elapsed = System.currentTimeMillis() - startTimeMs
+                if (elapsed >= epochMs) {
+                    logger.info { "Epoch duration reached (${elapsed}ms). Shutting down." }
+                    if (!dryRun && privateWs != null) {
+                        privateWs.sendCommand(Command.CancelAll(botConfig.symbol))
+                        delay(1000)
+                    }
+                    break
+                }
+            }
+        }
+
+        publicWs.close()
+        privateWs?.close()
+        pipeline.stop()
+        restClient?.close()
+        scope.cancel()
+    }
+
+private data class ParsedArgs(
+    val dryRun: Boolean = false,
+    val symbol: String = "PF_XRPUSD",
+    val epochDurationMs: Long? = null,
+    val strategyClass: String = "SimpleMarketMaker",
+)
+
+private fun parseArgs(args: Array<String>): ParsedArgs {
+    var dryRun = false
+    var symbol = "PF_XRPUSD"
+    var epochDurationMs: Long? = null
+    var strategyClass = "SimpleMarketMaker"
+
+    for (arg in args) {
+        when {
+            arg == "--dry-run" -> dryRun = true
+            arg.startsWith("--symbol=") -> symbol = arg.substringAfter("=")
+            arg.startsWith("--epoch-duration=") -> epochDurationMs = arg.substringAfter("=").toLongOrNull()
+            arg.startsWith("--strategy=") -> strategyClass = arg.substringAfter("=")
         }
     }
+
+    return ParsedArgs(
+        dryRun = dryRun,
+        symbol = symbol,
+        epochDurationMs = epochDurationMs,
+        strategyClass = strategyClass,
+    )
+}

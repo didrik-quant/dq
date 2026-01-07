@@ -11,4 +11,6 @@ public data class BotConfig(
     val riskConfig: RiskConfig = RiskConfig(),
     val requoteIntervalMs: Long = 2000,
     val dryRun: Boolean = false,
+    val epochDurationMs: Long? = null,
+    val strategyClass: String = "SimpleMarketMaker",
 )
