@@ -347,3 +347,96 @@ Amending is preferred over cancel+replace because:
 2. Tune `amendThresholdBps` based on observed behavior
 3. Consider adding multiple price levels (ladder) once single-level works
 4. Experiment with different skew curves
+---
+
+## Epoch 4 - 2026-01-08 20:07 to 2026-01-08 20:07 UTC
+
+### Changes
+
+```diff
+diff --git a/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt b/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt
+index 5c3fe47..f7e9f08 100644
+--- a/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt
++++ b/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt
+@@ -8,12 +8,12 @@ import java.math.BigDecimal
+ import java.math.RoundingMode
+ 
+ public class AgentXrpStrategy(
+-    private val spreadBps: Int = 8,
++    private val spreadBps: Int = 6,
+     private val orderSize: BigDecimal = BigDecimal("15"),
+     private val skewFactor: BigDecimal = BigDecimal("0.00015"),
+     private val tickSize: BigDecimal = BigDecimal("0.00001"),
+     private val maxPosition: BigDecimal = BigDecimal("75"),
+-    private val amendThresholdBps: Int = 5,
++    private val amendThresholdBps: Int = 3,
+ ) : Strategy {
+     override fun onOrderBook(
+         book: OrderBook,
+```
+
+### Results
+
+- Sharpe: 0
+
+---
+
+## Epoch 5 - 2026-01-08 20:09 to 2026-01-08 20:09 UTC
+
+### Changes
+
+```diff
+diff --git a/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt b/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt
+index f7e9f08..7c79a42 100644
+--- a/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt
++++ b/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt
+@@ -14,6 +14,8 @@ public class AgentXrpStrategy(
+     private val tickSize: BigDecimal = BigDecimal("0.00001"),
+     private val maxPosition: BigDecimal = BigDecimal("75"),
+     private val amendThresholdBps: Int = 3,
++    private val depthCheckQty: BigDecimal = BigDecimal("100"),
++    private val maxSpreadWidenBps: Int = 4,
+ ) : Strategy {
+     override fun onOrderBook(
+         book: OrderBook,
+@@ -24,8 +26,11 @@ public class AgentXrpStrategy(
+ 
+         val mid = book.midPrice ?: return emptyList()
+ 
++        // Adaptive spread: widen when top-of-book depth is thin
++        val adaptiveSpreadBps = spreadBps + calculateDepthAdjustment(book, mid)
++
+         val spreadDecimal =
+-            BigDecimal(spreadBps).divide(BigDecimal("20000"), 8, RoundingMode.HALF_UP)
++            BigDecimal(adaptiveSpreadBps).divide(BigDecimal("20000"), 8, RoundingMode.HALF_UP)
+         val halfSpread = mid * spreadDecimal
+ 
+         val skew = position * skewFactor
+@@ -108,4 +113,22 @@ public class AgentXrpStrategy(
+         val bpsDecimal = diff.divide(mid, 8, RoundingMode.HALF_UP)
+         return bpsDecimal.multiply(BigDecimal("10000")).toInt()
+     }
++
++    private fun calculateDepthAdjustment(
++        book: OrderBook,
++        mid: BigDecimal,
++    ): Int {
++        val topBids = book.topBids(5)
++        val topAsks = book.topAsks(5)
++
++        val bidDepth = topBids.sumOf { it.qty }
++        val askDepth = topAsks.sumOf { it.qty }
++        val minDepth = bidDepth.min(askDepth)
++
++        if (minDepth >= depthCheckQty) return 0
++
++        val depthRatio = minDepth.divide(depthCheckQty, 8, RoundingMode.HALF_UP)
++        val widenFactor = BigDecimal.ONE - depthRatio
++        return widenFactor.multiply(BigDecimal(maxSpreadWidenBps)).toInt()
++    }
+ }
+```
+
+### Results
+
+- Sharpe: 0
