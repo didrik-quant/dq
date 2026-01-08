@@ -51,6 +51,7 @@ public class Harness(private val config: HarnessConfig) {
             if (!buildResult.success) {
                 logger.error { "Build failed, logging failure and continuing to next epoch" }
                 evolutionLog.appendFailure(epoch, diff, "BUILD_FAILED", buildResult.error ?: "Unknown error")
+                commitEvolutionLog("Epoch $epoch: BUILD_FAILED")
                 return
             }
 
@@ -61,6 +62,7 @@ public class Harness(private val config: HarnessConfig) {
             if (botResult.crashed) {
                 logger.error { "Bot crashed, logging failure" }
                 evolutionLog.appendFailure(epoch, diff, "RUNTIME_CRASH", botResult.error ?: "Unknown error")
+                commitEvolutionLog("Epoch $epoch: RUNTIME_CRASH")
                 // Don't merge crashed code back to main
                 return
             }
@@ -215,6 +217,29 @@ public class Harness(private val config: HarnessConfig) {
             lines.drop(exceptionStart).take(15).joinToString("\n")
         } else {
             lines.takeLast(20).joinToString("\n")
+        }
+    }
+
+    private fun commitEvolutionLog(message: String) {
+        val evolutionFile = config.evolutionLogPath.toString()
+        val process = ProcessBuilder("git", "add", evolutionFile)
+            .directory(config.repoRoot.toFile())
+            .redirectErrorStream(true)
+            .start()
+        process.waitFor()
+
+        val statusProcess = ProcessBuilder("git", "diff", "--cached", "--quiet")
+            .directory(config.repoRoot.toFile())
+            .start()
+        val hasChanges = statusProcess.waitFor() != 0
+
+        if (hasChanges) {
+            val commitProcess = ProcessBuilder("git", "commit", "-m", message)
+                .directory(config.repoRoot.toFile())
+                .inheritIO()
+                .start()
+            commitProcess.waitFor()
+            logger.info { "Committed evolution log: $message" }
         }
     }
 }
