@@ -27,7 +27,9 @@ public class Harness(private val config: HarnessConfig) {
         Files.createDirectories(config.agentDir)
 
         if (!opencodeClient.healthCheck()) {
-            error("Cannot connect to opencode server at ${config.opencodeHost}:${config.opencodePort}. Start it with: opencode serve --port ${config.opencodePort}")
+            error(
+                "Cannot connect to opencode server at ${config.opencodeHost}:${config.opencodePort}. Start it with: opencode serve --port ${config.opencodePort}"
+            )
         }
 
         while (true) {
@@ -136,7 +138,7 @@ public class Harness(private val config: HarnessConfig) {
             4. Fix any build errors before finishing
 
             This is epoch $epoch. Good luck.
-        """.trimIndent()
+            """.trimIndent()
     }
 
     private data class BuildResult(val success: Boolean, val error: String? = null)
@@ -175,7 +177,10 @@ public class Harness(private val config: HarnessConfig) {
         val logFile = Files.createTempFile("bot-output", ".log")
 
         val args = listOf(
-            "bazel", "run", "//bot", "--",
+            "bazel",
+            "run",
+            "//bot",
+            "--",
             "--epoch-trades=${config.epochTradeCount}",
             "--epoch-max-duration=${config.epochMaxDurationMs}",
             "--strategy=${config.strategyClass}",

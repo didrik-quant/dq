@@ -69,7 +69,8 @@ public class OpencodeClient(
             .replace("\r", "\\r")
             .replace("\t", "\\t")
 
-        val body = """{"parts":[{"type":"text","text":"$escapedPrompt"}],"model":{"providerID":"$providerID","modelID":"$modelID"}}"""
+        val body = """{"parts":[{"type":"text","text":"$escapedPrompt"}],""" +
+            """"model":{"providerID":"$providerID","modelID":"$modelID"}}"""
 
         val request = HttpRequest.newBuilder()
             .uri(URI.create("$baseUrl/session/$sessionId/message"))

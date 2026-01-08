@@ -49,8 +49,11 @@ public class ChronicleEventStore(
     private fun openNewFile() {
         val filename = "${currentDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}.dat"
         currentFile = dataDir.resolve(filename)
-        val fos = Files.newOutputStream(currentFile, java.nio.file.StandardOpenOption.CREATE,
-            java.nio.file.StandardOpenOption.APPEND)
+        val fos = Files.newOutputStream(
+            currentFile,
+            java.nio.file.StandardOpenOption.CREATE,
+            java.nio.file.StandardOpenOption.APPEND
+        )
         outputStream = DataOutputStream(BufferedOutputStream(fos, 65536))
         logger.debug { "Opened event file: $currentFile" }
     }

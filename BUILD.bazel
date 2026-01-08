@@ -2,6 +2,20 @@
 
 load("@rules_kotlin//kotlin:core.bzl", "define_kt_toolchain", "kt_compiler_plugin", "kt_kotlinc_options")
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_config")
+
+# ktlint configuration - used by all ktlint_test and ktlint_fix targets
+filegroup(
+    name = "editorconfig",
+    srcs = [".editorconfig"],
+    visibility = ["//visibility:public"],
+)
+
+ktlint_config(
+    name = "ktlint_config",
+    editorconfig = "//:editorconfig",
+    visibility = ["//visibility:public"],
+)
 
 # Kotlin compiler options
 kt_kotlinc_options(

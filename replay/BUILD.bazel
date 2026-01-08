@@ -1,13 +1,13 @@
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
-load("@rules_kotlin//kotlin:lint.bzl", "ktlint_test")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_fix", "ktlint_test")
 
 kt_jvm_library(
     name = "replay",
     srcs = glob(["src/main/kotlin/**/*.kt"]),
     visibility = ["//visibility:public"],
     deps = [
-        "//core",
         "//:kotlin_serialization",
+        "//core",
         "@maven//:com_github_luben_zstd_jni",
         "@maven//:com_lmax_disruptor",
         "@maven//:io_github_microutils_kotlin_logging_jvm",
@@ -17,4 +17,12 @@ kt_jvm_library(
 ktlint_test(
     name = "ktlint",
     srcs = glob(["src/main/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
+    tags = ["ktlint"],
+)
+
+ktlint_fix(
+    name = "ktlint_fix",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
 )

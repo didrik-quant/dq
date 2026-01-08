@@ -1,4 +1,5 @@
 """Build tools and utilities."""
 
-# ktlint tests are defined in each module's BUILD.bazel
-# Run all lint tests with: bazel test //...:all --test_tag_filters=ktlint
+# ktlint is integrated via rules_kotlin. See AGENTS.md for details.
+# Run all lint tests with: bazel test //... --test_tag_filters=ktlint
+# Auto-fix lint errors: bazel run //module:ktlint_fix

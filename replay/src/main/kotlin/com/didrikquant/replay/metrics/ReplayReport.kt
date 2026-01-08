@@ -4,7 +4,6 @@ import com.didrikquant.replay.player.ReplayStats
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import java.math.BigDecimal
 
 @Serializable
 public data class ReplayReport(

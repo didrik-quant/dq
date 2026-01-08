@@ -1,5 +1,5 @@
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
-load("@rules_kotlin//kotlin:lint.bzl", "ktlint_test")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_fix", "ktlint_test")
 
 kt_jvm_library(
     name = "core",
@@ -15,4 +15,12 @@ kt_jvm_library(
 ktlint_test(
     name = "ktlint",
     srcs = glob(["src/main/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
+    tags = ["ktlint"],
+)
+
+ktlint_fix(
+    name = "ktlint_fix",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
 )

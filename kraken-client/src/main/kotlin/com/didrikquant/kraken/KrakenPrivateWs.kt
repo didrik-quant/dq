@@ -35,6 +35,7 @@ public class KrakenPrivateWs(
     private var session: WebSocketSession? = null
     private var job: Job? = null
     private var challenge: String? = null
+
     @Volatile
     private var ready: Boolean = false
     private val subscribedFeeds = mutableSetOf<String>()
@@ -70,7 +71,9 @@ public class KrakenPrivateWs(
                                     launch { processCommands() }
                                 }
                             } else {
-                                logger.error { "Failed to subscribe to all feeds. Got: $subscribedFeeds, needed: $requiredFeeds" }
+                                logger.error {
+                                    "Failed to subscribe to all feeds. Got: $subscribedFeeds, needed: $requiredFeeds"
+                                }
                             }
                         }
                     }
@@ -279,7 +282,9 @@ public class KrakenPrivateWs(
                 "fills_snapshot" -> {
                     // Don't publish historical fills - they would incorrectly count towards epoch targets
                     val fills = obj["fills"]?.jsonArray
-                    logger.info { "Received fills_snapshot with ${fills?.size ?: 0} historical fills (not counting towards epoch)" }
+                    logger.info {
+                        "Received fills_snapshot with ${fills?.size ?: 0} historical fills (not counting towards epoch)"
+                    }
                 }
                 "open_orders", "open_orders_snapshot" -> processOpenOrders(obj)
                 "open_positions", "open_positions_snapshot" -> processPositions(obj)

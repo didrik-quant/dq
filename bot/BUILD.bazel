@@ -1,5 +1,5 @@
-load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library", "kt_jvm_binary")
-load("@rules_kotlin//kotlin:lint.bzl", "ktlint_test")
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_binary", "kt_jvm_library")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_fix", "ktlint_test")
 
 kt_jvm_library(
     name = "bot-lib",
@@ -8,15 +8,15 @@ kt_jvm_library(
     visibility = ["//visibility:public"],
     deps = [
         "//core",
-        "//kraken-client",
-        "//strategy",
-        "//risk",
         "//execution",
+        "//kraken-client",
         "//replay",
-        "@maven//:com_lmax_disruptor",
-        "@maven//:org_jetbrains_kotlinx_kotlinx_coroutines_core_jvm",
-        "@maven//:io_github_microutils_kotlin_logging_jvm",
+        "//risk",
+        "//strategy",
         "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:com_lmax_disruptor",
+        "@maven//:io_github_microutils_kotlin_logging_jvm",
+        "@maven//:org_jetbrains_kotlinx_kotlinx_coroutines_core_jvm",
     ],
 )
 
@@ -30,4 +30,12 @@ kt_jvm_binary(
 ktlint_test(
     name = "ktlint",
     srcs = glob(["src/main/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
+    tags = ["ktlint"],
+)
+
+ktlint_fix(
+    name = "ktlint_fix",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
 )

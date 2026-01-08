@@ -33,6 +33,7 @@ public class KrakenPublicWs(
 
     private var session: WebSocketSession? = null
     private var job: Job? = null
+
     @Volatile
     private var ready: Boolean = false
 

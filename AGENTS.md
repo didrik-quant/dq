@@ -34,6 +34,39 @@ bazel clean --expunge
 - Max line length: 120 characters
 - Use explicit API mode for public APIs
 
+## Linting (ktlint)
+
+ktlint is integrated via Bazel using `rules_kotlin`. Configuration is in `.editorconfig`.
+
+```bash
+# Check all modules for lint errors
+bazel test //... --test_tag_filters=ktlint
+
+# Check a specific module
+bazel test //core:ktlint
+
+# Auto-fix lint errors in a module
+bazel run //core:ktlint_fix
+
+# Auto-fix all modules (run each)
+bazel run //bot:ktlint_fix
+bazel run //core:ktlint_fix
+bazel run //cli:ktlint_fix
+bazel run //execution:ktlint_fix
+bazel run //harness:ktlint_fix
+bazel run //kraken-client:ktlint_fix
+bazel run //replay:ktlint_fix
+bazel run //risk:ktlint_fix
+bazel run //strategy:ktlint_fix
+bazel run //example:ktlint_fix
+```
+
+Each module has two ktlint targets:
+- `//module:ktlint` - Test target (fails build on lint errors)
+- `//module:ktlint_fix` - Run target (auto-fixes what it can)
+
+**Note**: Some errors (like `max-line-length`) cannot be auto-fixed and must be corrected manually.
+
 ## Adding Dependencies
 
 Maven dependencies are managed in `MODULE.bazel`:
@@ -61,7 +94,7 @@ deps = ["@maven//:group_artifact"]
 Example BUILD.bazel for a new module:
 ```python
 load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library")
-load("@rules_kotlin//kotlin:lint.bzl", "ktlint_test")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_fix", "ktlint_test")
 
 kt_jvm_library(
     name = "mymodule",
@@ -72,6 +105,14 @@ kt_jvm_library(
 ktlint_test(
     name = "ktlint",
     srcs = glob(["src/main/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
+    tags = ["ktlint"],
+)
+
+ktlint_fix(
+    name = "ktlint_fix",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
 )
 ```
 
