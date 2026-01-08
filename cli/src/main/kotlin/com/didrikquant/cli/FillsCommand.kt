@@ -22,19 +22,36 @@ public class FillsCommand(private val dataDir: Path) {
         tailer.seekToDate(startDate)
 
         val fills = mutableListOf<Event.OrderFill>()
+        var skippedEvents = 0
 
-        while (tailer.hasNext()) {
-            val recorded = tailer.next()
-            if (recorded.eventTimestamp < lastEpochStart.toEpochMilli()) continue
+        try {
+            while (tailer.hasNext()) {
+                try {
+                    val recorded = tailer.next()
+                    if (recorded.eventTimestamp < lastEpochStart.toEpochMilli()) continue
 
-            val event = RecordedEvent.toEvent(recorded)
-            if (event is Event.OrderFill) {
-                fills.add(event)
+                    val event = RecordedEvent.toEvent(recorded)
+                    if (event is Event.OrderFill) {
+                        fills.add(event)
+                    }
+                } catch (e: Exception) {
+                    skippedEvents++
+                    if (skippedEvents > 100) {
+                        System.err.println("Too many corrupted events, stopping")
+                        break
+                    }
+                }
             }
+        } catch (e: Exception) {
+            System.err.println("Error reading recordings: ${e.message}")
         }
 
         tailer.close()
         store.close()
+
+        if (skippedEvents > 0) {
+            System.err.println("Warning: Skipped $skippedEvents corrupted events")
+        }
 
         if (fills.isEmpty()) {
             println("No fills in last epoch")

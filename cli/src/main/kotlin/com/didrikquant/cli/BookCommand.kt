@@ -24,30 +24,47 @@ public class BookCommand(private val dataDir: Path) {
         var orderBook: OrderBook? = null
         var lastEventTimestamp: Long = 0
         var sequence: Long = 0
+        var skippedEvents = 0
 
-        while (tailer.hasNext()) {
-            val recorded = tailer.next()
-            if (recorded.eventTimestamp > targetTimestamp) break
+        try {
+            while (tailer.hasNext()) {
+                try {
+                    val recorded = tailer.next()
+                    if (recorded.eventTimestamp > targetTimestamp) break
 
-            val event = RecordedEvent.toEvent(recorded)
-            when (event) {
-                is Event.BookSnapshot -> {
-                    if (orderBook == null || orderBook.symbol != event.symbol) {
-                        orderBook = OrderBook(event.symbol)
+                    val event = RecordedEvent.toEvent(recorded)
+                    when (event) {
+                        is Event.BookSnapshot -> {
+                            if (orderBook == null || orderBook.symbol != event.symbol) {
+                                orderBook = OrderBook(event.symbol)
+                            }
+                            orderBook.applySnapshot(event.bids, event.asks, sequence++)
+                            lastEventTimestamp = event.timestamp
+                        }
+                        is Event.BookUpdate -> {
+                            orderBook?.applyUpdate(event.bids, event.asks, sequence++)
+                            lastEventTimestamp = event.timestamp
+                        }
+                        else -> {}
                     }
-                    orderBook.applySnapshot(event.bids, event.asks, sequence++)
-                    lastEventTimestamp = event.timestamp
+                } catch (e: Exception) {
+                    skippedEvents++
+                    if (skippedEvents > 100) {
+                        System.err.println("Too many corrupted events, stopping")
+                        break
+                    }
                 }
-                is Event.BookUpdate -> {
-                    orderBook?.applyUpdate(event.bids, event.asks, sequence++)
-                    lastEventTimestamp = event.timestamp
-                }
-                else -> {}
             }
+        } catch (e: Exception) {
+            System.err.println("Error reading recordings: ${e.message}")
         }
 
         tailer.close()
         store.close()
+
+        if (skippedEvents > 0) {
+            System.err.println("Warning: Skipped $skippedEvents corrupted events")
+        }
 
         if (orderBook == null || !orderBook.isValid()) {
             println("No order book data found at timestamp $targetTimestamp")
