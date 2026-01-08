@@ -8,7 +8,7 @@ private val logger = KotlinLogging.logger {}
 
 public class WorktreeManager(private val repoRoot: Path) {
 
-    private val worktreesDir: Path = repoRoot.resolve(".harness-worktrees")
+    private val worktreesDir: Path = Path.of(System.getProperty("user.home"), ".dq", "worktrees")
 
     public fun create(branchName: String): Path {
         Files.createDirectories(worktreesDir)
