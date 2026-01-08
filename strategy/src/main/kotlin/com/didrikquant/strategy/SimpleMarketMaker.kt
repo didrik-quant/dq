@@ -9,11 +9,13 @@ import com.didrikquant.core.roundToTick
 import java.math.BigDecimal
 import java.math.RoundingMode
 
+@Suppress("unused")
 public class SimpleMarketMaker(
     private val spreadBps: Int = 10,
     private val orderSize: BigDecimal = BigDecimal("15"),
     private val skewFactor: BigDecimal = BigDecimal("0.0001"),
     private val tickSize: BigDecimal = BigDecimal("0.00001"),
+    private val maxPosition: BigDecimal = BigDecimal("100"),
 ) : Strategy {
     override fun onBookSnapshot(
         book: OrderBookSnapshot,

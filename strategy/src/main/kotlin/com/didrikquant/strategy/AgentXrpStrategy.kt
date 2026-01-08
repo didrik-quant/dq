@@ -14,7 +14,7 @@ public class AgentXrpStrategy(
     private val orderSize: BigDecimal = BigDecimal("15"),
     private val skewFactor: BigDecimal = BigDecimal("0.00015"),
     private val tickSize: BigDecimal = BigDecimal("0.00001"),
-    private val maxPosition: BigDecimal = BigDecimal("75"),
+    private val maxPosition: BigDecimal,
     private val amendThresholdBps: Int = 3,
     private val depthCheckQty: BigDecimal = BigDecimal("100"),
     private val maxSpreadWidenBps: Int = 4,

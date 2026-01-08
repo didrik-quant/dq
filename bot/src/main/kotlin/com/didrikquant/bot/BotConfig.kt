@@ -7,6 +7,7 @@ public data class BotConfig(
     val symbol: String = "PF_XRPUSD",
     val spreadBps: Int = 10,
     val orderSize: BigDecimal = BigDecimal("10"),
+    val maxPosition: BigDecimal = BigDecimal("100"),
     val tickSize: BigDecimal = BigDecimal("0.0001"),
     val riskConfig: RiskConfig = RiskConfig(),
     val requoteIntervalMs: Long = 2000,

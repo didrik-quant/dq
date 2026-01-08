@@ -116,12 +116,14 @@ public class Pipeline(
                         spreadBps = config.spreadBps,
                         orderSize = config.orderSize,
                         tickSize = config.tickSize,
+                        maxPosition = config.maxPosition,
                     )
                 "AgentXrpStrategy" ->
                     AgentXrpStrategy(
                         spreadBps = config.spreadBps,
                         orderSize = config.orderSize,
                         tickSize = config.tickSize,
+                        maxPosition = config.maxPosition,
                     )
                 else -> error("Unknown strategy class: ${config.strategyClass}")
             }

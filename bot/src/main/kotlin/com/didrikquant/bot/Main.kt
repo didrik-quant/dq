@@ -6,6 +6,7 @@ import com.didrikquant.kraken.KrakenPrivateWs
 import com.didrikquant.kraken.KrakenPublicWs
 import com.didrikquant.kraken.KrakenRestClient
 import com.didrikquant.replay.recorder.RecorderConfig
+import com.didrikquant.risk.RiskConfig
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,7 +21,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import mu.KotlinLogging
 import java.math.BigDecimal
-import kotlin.system.exitProcess
+import java.math.RoundingMode
 
 private val logger = KotlinLogging.logger {}
 
@@ -43,26 +44,19 @@ public fun main(args: Array<String>): Unit = runBlocking {
         KrakenConfig.fromEnv()
     }
 
-    val botConfig = BotConfig(
-        symbol = parsedArgs.symbol,
-        spreadBps = 10,
-        orderSize = BigDecimal("10"),
-        requoteIntervalMs = 2000,
-        dryRun = dryRun,
-        epochTradeCount = parsedArgs.epochTradeCount,
-        epochMaxDurationMs = parsedArgs.epochMaxDurationMs,
-        strategyClass = parsedArgs.strategyClass,
-    )
-
-    logger.info { "Config: symbol=${botConfig.symbol}, strategy=${botConfig.strategyClass}" }
-
     val recorderConfig = RecorderConfig.fromEnv()
     logger.info { "Recording to: ${recorderConfig.dataDir}" }
 
     val restClient: KrakenRestClient? = if (dryRun) null else KrakenRestClient(krakenConfig)
 
-    if (!dryRun && restClient != null) {
-        logger.info { "Verifying API credentials..." }
+    val marginLimits: MarginLimits = if (dryRun || restClient == null) {
+        logger.info { "Dry-run mode: using default margin limits" }
+        MarginLimits(
+            maxPosition = BigDecimal("100"),
+            orderSize = BigDecimal("10"),
+        )
+    } else {
+        logger.info { "Verifying API credentials and calculating margin limits..." }
         try {
             val accounts = restClient.getAccounts()
             val result = accounts["result"]?.jsonPrimitive?.contentOrNull
@@ -79,14 +73,41 @@ public fun main(args: Array<String>): Unit = runBlocking {
                 return@runBlocking
             }
             val flexAccount = accountsData["flex"]?.jsonObject
-            val balance = flexAccount?.get("portfolioValue")?.jsonPrimitive?.doubleOrNull ?: 0.0
-            logger.info { "API verified. Account portfolio value: ${"%.2f".format(balance)} USD" }
+            val portfolioValue = flexAccount?.get("portfolioValue")?.jsonPrimitive?.doubleOrNull ?: 0.0
+            val availableMargin = flexAccount?.get("availableMargin")?.jsonPrimitive?.doubleOrNull ?: portfolioValue
+
+            logger.info {
+                "API verified. Portfolio: ${"%.2f".format(portfolioValue)} USD, " +
+                    "Available margin: ${"%.2f".format(availableMargin)} USD"
+            }
+
+            calculateMarginLimits(availableMargin)
         } catch (e: Exception) {
             logger.error(e) { "Failed to verify API credentials" }
             restClient.close()
             return@runBlocking
         }
     }
+
+    logger.info { "Margin limits: maxPosition=${marginLimits.maxPosition}, orderSize=${marginLimits.orderSize}" }
+
+    val botConfig = BotConfig(
+        symbol = parsedArgs.symbol,
+        spreadBps = 10,
+        orderSize = marginLimits.orderSize,
+        maxPosition = marginLimits.maxPosition,
+        requoteIntervalMs = 2000,
+        dryRun = dryRun,
+        epochTradeCount = parsedArgs.epochTradeCount,
+        epochMaxDurationMs = parsedArgs.epochMaxDurationMs,
+        strategyClass = parsedArgs.strategyClass,
+        riskConfig = RiskConfig(
+            maxPositionSize = marginLimits.maxPosition,
+            maxOrderSize = marginLimits.orderSize,
+        ),
+    )
+
+    logger.info { "Config: symbol=${botConfig.symbol}, strategy=${botConfig.strategyClass}" }
 
     val pipeline = Pipeline(botConfig)
     val disruptor = pipeline.start(recorderConfig, restClient)
@@ -225,5 +246,26 @@ private fun parseArgs(args: Array<String>): ParsedArgs {
         epochTradeCount = epochTradeCount,
         epochMaxDurationMs = epochMaxDurationMs,
         strategyClass = strategyClass,
+    )
+}
+
+private data class MarginLimits(
+    val maxPosition: BigDecimal,
+    val orderSize: BigDecimal,
+)
+
+private fun calculateMarginLimits(availableMargin: Double): MarginLimits {
+    val usableMargin = availableMargin * 0.5
+
+    val initialMarginRate = 0.02
+    val xrpPrice = 2.30
+
+    val maxNotional = usableMargin / initialMarginRate
+    val maxPos = (maxNotional / xrpPrice).toBigDecimal().setScale(0, RoundingMode.DOWN)
+    val ordSize = (maxPos / BigDecimal("5")).max(BigDecimal("1"))
+
+    return MarginLimits(
+        maxPosition = maxPos.max(BigDecimal.ZERO),
+        orderSize = ordSize,
     )
 }
