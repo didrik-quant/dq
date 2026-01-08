@@ -117,7 +117,12 @@ public class Harness(private val config: HarnessConfig) {
         }
 
         return """
-            You are a trading strategy developer. Your task is to improve the strategy for ${config.instrument}.
+            You are a trading strategy developer. Your objective is to MAXIMIZE SHARPE RATIO for ${config.instrument}.
+            
+            CONSTRAINTS:
+            - You CANNOT rely on being the fastest. Assume other participants have lower latency.
+            - You are NOT required to implement market making. Any strategy that improves Sharpe is valid.
+            - The algorithm type doesn't matter—momentum, mean reversion, statistical arbitrage, whatever works.
             
             WORKING DIRECTORY: $worktreePath
             
