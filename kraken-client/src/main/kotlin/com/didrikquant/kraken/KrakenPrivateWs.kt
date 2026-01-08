@@ -195,7 +195,7 @@ public class KrakenPrivateWs(
                     is Command.PlaceOrder -> executeOrder(command)
                     is Command.CancelOrder -> cancelOrder(command)
                     is Command.CancelAll -> cancelAllOrders(command)
-                    is Command.AmendOrder -> logger.warn { "Amend not implemented for futures" }
+                    is Command.AmendOrder -> amendOrder(command)
                 }
             } catch (e: Exception) {
                 logger.error(e) { "Failed to execute command: $command" }
@@ -248,6 +248,23 @@ public class KrakenPrivateWs(
             logger.info { "All orders canceled" }
         } else {
             logger.error { "Cancel all failed: $response" }
+        }
+    }
+
+    private suspend fun amendOrder(cmd: Command.AmendOrder) {
+        val response = restClient.editOrder(
+            orderId = cmd.orderId,
+            limitPrice = cmd.newPrice.toDouble(),
+            size = cmd.newQty?.toDouble(),
+        )
+        val result = response["result"]?.jsonPrimitive?.contentOrNull
+        if (result == "success") {
+            val editStatus = response["editStatus"]?.jsonObject
+            val orderId = editStatus?.get("orderId")?.jsonPrimitive?.contentOrNull ?: cmd.orderId
+            logger.info { "Order amended: $orderId to price=${cmd.newPrice}" }
+        } else {
+            val error = response["error"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
+            logger.error { "Amend failed for ${cmd.orderId}: $error" }
         }
     }
 

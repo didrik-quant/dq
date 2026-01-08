@@ -21,6 +21,7 @@ public sealed class Command {
     public data class AmendOrder(
         val orderId: String,
         val newPrice: BigDecimal,
+        val newQty: BigDecimal? = null,
     ) : Command()
 
     public data class CancelAll(

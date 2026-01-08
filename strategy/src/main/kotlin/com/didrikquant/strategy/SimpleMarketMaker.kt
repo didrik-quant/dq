@@ -1,6 +1,9 @@
 package com.didrikquant.strategy
 
-import com.didrikquant.core.*
+import com.didrikquant.core.OrderBook
+import com.didrikquant.core.Side
+import com.didrikquant.core.TrackedOrder
+import com.didrikquant.core.roundToTick
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -10,20 +13,18 @@ public class SimpleMarketMaker(
     private val skewFactor: BigDecimal = BigDecimal("0.0001"),
     private val tickSize: BigDecimal = BigDecimal("0.00001"),
 ) : Strategy {
-
-    override fun onOrderBook(book: OrderBook, position: BigDecimal): List<OrderIntent> {
+    override fun onOrderBook(
+        book: OrderBook,
+        position: BigDecimal,
+        openOrders: List<TrackedOrder>,
+    ): List<StrategyAction> {
         if (!book.isValid()) return emptyList()
 
         val mid = book.midPrice ?: return emptyList()
 
-        // Half spread in decimal form (10 bps = 0.001, so half = 0.0005)
-        val halfSpread = mid * BigDecimal(spreadBps).divide(
-            BigDecimal("20000"),
-            8,
-            RoundingMode.HALF_UP,
-        )
+        val spreadDecimal = BigDecimal(spreadBps).divide(BigDecimal("20000"), 8, RoundingMode.HALF_UP)
+        val halfSpread = mid * spreadDecimal
 
-        // Skew based on position: positive position -> lower bid, higher ask
         val skew = position * skewFactor
 
         val rawBidPrice = mid - halfSpread - skew
@@ -32,9 +33,18 @@ public class SimpleMarketMaker(
         val bidPrice = rawBidPrice.roundToTick(tickSize)
         val askPrice = rawAskPrice.roundToTick(tickSize)
 
-        return listOf(
-            OrderIntent(Side.BUY, bidPrice, orderSize),
-            OrderIntent(Side.SELL, askPrice, orderSize),
-        )
+        val actions = mutableListOf<StrategyAction>()
+
+        val existingBid = openOrders.find { it.side == Side.BUY }
+        val existingAsk = openOrders.find { it.side == Side.SELL }
+
+        if (existingBid == null) {
+            actions.add(StrategyAction.Place(OrderIntent(Side.BUY, bidPrice, orderSize)))
+        }
+        if (existingAsk == null) {
+            actions.add(StrategyAction.Place(OrderIntent(Side.SELL, askPrice, orderSize)))
+        }
+
+        return actions
     }
 }

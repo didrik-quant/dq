@@ -211,3 +211,139 @@ index f57fc6c..8816d1e 100644
 ### Results
 
 - Sharpe: 0
+
+---
+
+## Epoch 3 - 2026-01-08 01:03 to 2026-01-08 01:04 UTC
+
+### Changes
+
+```diff
+diff --git a/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt b/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt
+index f57fc6c..3f203c2 100644
+--- a/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt
++++ b/strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt
+@@ -7,10 +7,11 @@ import java.math.BigDecimal
+ import java.math.RoundingMode
+ 
+ public class AgentXrpStrategy(
+-    private val spreadBps: Int = 10,
++    private val spreadBps: Int = 8,
+     private val orderSize: BigDecimal = BigDecimal("15"),
+-    private val skewFactor: BigDecimal = BigDecimal("0.0001"),
++    private val skewFactor: BigDecimal = BigDecimal("0.00015"),
+     private val tickSize: BigDecimal = BigDecimal("0.00001"),
++    private val maxPosition: BigDecimal = BigDecimal("75"),
+ ) : Strategy {
+ 
+     override fun onOrderBook(book: OrderBook, position: BigDecimal): List<OrderIntent> {
+@@ -32,9 +33,23 @@ public class AgentXrpStrategy(
+         val bidPrice = rawBidPrice.roundToTick(tickSize)
+         val askPrice = rawAskPrice.roundToTick(tickSize)
+ 
++        val positionRatio = position.divide(maxPosition, 8, RoundingMode.HALF_UP)
++            .max(-BigDecimal.ONE).min(BigDecimal.ONE)
++
++        val inventoryScaleFactor = BigDecimal("0.8")
++        val minSizeAtLimit = BigDecimal("3")
++
++        val longExposure = positionRatio.max(BigDecimal.ZERO)
++        val shortExposure = positionRatio.min(BigDecimal.ZERO).abs()
++
++        val bidSize = (orderSize * (BigDecimal.ONE - longExposure * inventoryScaleFactor))
++            .setScale(0, RoundingMode.DOWN).max(minSizeAtLimit)
++        val askSize = (orderSize * (BigDecimal.ONE - shortExposure * inventoryScaleFactor))
++            .setScale(0, RoundingMode.DOWN).max(minSizeAtLimit)
++
+         return listOf(
+-            OrderIntent(Side.BUY, bidPrice, orderSize),
+-            OrderIntent(Side.SELL, askPrice, orderSize),
++            OrderIntent(Side.BUY, bidPrice, bidSize),
++            OrderIntent(Side.SELL, askPrice, askSize),
+         )
+     }
+ }
+```
+
+### Results
+
+- Sharpe: 0
+
+---
+
+## Infrastructure Update - Order Lifecycle Management
+
+### Problem Identified
+
+Previous epochs had Sharpe: 0 because:
+1. Strategy was **stateless** - emitted new orders every 2s without knowledge of existing orders
+2. No mechanism to cancel/amend stale orders - they accumulated on the exchange
+3. `maxOpenOrders=10` limit caused RiskChecker to block ALL new orders after ~10 seconds
+4. Old orders sat at stale prices, new quotes never got placed
+
+### Solution Implemented
+
+The strategy interface now supports full order lifecycle management:
+
+**New Interface:**
+```kotlin
+fun onOrderBook(
+    book: OrderBook,
+    position: BigDecimal,
+    openOrders: List<TrackedOrder>,  // NEW: sees its own orders
+): List<StrategyAction>  // NEW: returns actions (Place/Amend/Cancel)
+```
+
+**Available Actions:**
+- `StrategyAction.Place(intent)` - Place a new order
+- `StrategyAction.Amend(orderId, newPrice, newQty?)` - Amend existing order (preserves queue priority)
+- `StrategyAction.Cancel(orderId)` - Cancel an order
+
+### New Strategy Parameters
+
+```kotlin
+class AgentXrpStrategy(
+    // Existing pricing params
+    private val spreadBps: Int = 8,
+    private val orderSize: BigDecimal = BigDecimal("15"),
+    private val skewFactor: BigDecimal = BigDecimal("0.00015"),
+    private val tickSize: BigDecimal = BigDecimal("0.00001"),
+    private val maxPosition: BigDecimal = BigDecimal("75"),
+    
+    // NEW: Order lifecycle param
+    private val amendThresholdBps: Int = 5,  // Only amend if price drifted > 5 bps
+)
+```
+
+### Current Smart Diffing Logic
+
+For each side (bid/ask):
+1. **No existing order** → `Place` new order
+2. **Order crossed mid** (bid >= mid or ask <= mid) → `Cancel` immediately  
+3. **Order partially filled** → Leave alone (let it complete)
+4. **Price drift > amendThresholdBps** → `Amend` to new price
+5. **Price drift <= amendThresholdBps** → Do nothing (preserve queue priority)
+
+### Key Insight: Queue Priority
+
+Amending is preferred over cancel+replace because:
+- We don't have the best latency
+- Preserving queue position gives us an edge
+- The `amendThresholdBps` parameter controls the trade-off between staying tight vs preserving queue
+
+### Tunable Parameters for Evolution
+
+| Parameter | Current | Effect |
+|-----------|---------|--------|
+| `amendThresholdBps` | 5 | Lower = tighter quotes, more amends, less queue priority |
+| `spreadBps` | 8 | Your edge per round-trip |
+| `skewFactor` | 0.00015 | How aggressively to lean quotes based on inventory |
+| `inventoryScaleFactor` | 0.8 | How much to reduce size at position limits |
+| `minSizeAtLimit` | 3 | Minimum order size even at max position |
+
+### Next Steps for Agent
+
+1. Monitor fills with `dq fills` to see if orders are getting hit
+2. Tune `amendThresholdBps` based on observed behavior
+3. Consider adding multiple price levels (ladder) once single-level works
+4. Experiment with different skew curves

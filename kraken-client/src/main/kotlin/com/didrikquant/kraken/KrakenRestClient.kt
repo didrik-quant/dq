@@ -65,6 +65,19 @@ public class KrakenRestClient(private val config: KrakenConfig) {
         return authenticatedPost("/cancelallorders", params)
     }
 
+    public suspend fun editOrder(
+        orderId: String,
+        limitPrice: Double? = null,
+        size: Double? = null,
+    ): JsonObject {
+        val params = buildString {
+            append("orderId=$orderId")
+            limitPrice?.let { append("&limitPrice=$it") }
+            size?.let { append("&size=$it") }
+        }
+        return authenticatedPost("/editorder", params)
+    }
+
     private suspend fun authenticatedGet(endpoint: String): JsonObject {
         val postData = ""
         val endpointPath = "/api/v3$endpoint"

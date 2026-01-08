@@ -6,25 +6,6 @@ import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
 
-public data class TrackedOrder(
-    val orderId: String,
-    val clOrdId: String,
-    val symbol: String,
-    val side: Side,
-    val price: BigDecimal,
-    val originalQty: BigDecimal,
-    val filledQty: BigDecimal = BigDecimal.ZERO,
-    val status: OrderStatus = OrderStatus.PENDING,
-)
-
-public enum class OrderStatus {
-    PENDING,
-    OPEN,
-    PARTIALLY_FILLED,
-    FILLED,
-    CANCELED,
-}
-
 public class OrderManager(private val symbol: String) {
 
     private val orders = ConcurrentHashMap<String, TrackedOrder>()
@@ -38,6 +19,11 @@ public class OrderManager(private val symbol: String) {
 
     public fun getOpenOrders(): List<TrackedOrder> =
         orders.values.filter { it.status == OrderStatus.OPEN || it.status == OrderStatus.PARTIALLY_FILLED }
+
+    public fun getOpenOrderBySide(side: Side): TrackedOrder? =
+        orders.values.find {
+            it.side == side && (it.status == OrderStatus.OPEN || it.status == OrderStatus.PARTIALLY_FILLED)
+        }
 
     public fun generateClOrdId(): String = UUID.randomUUID().toString().replace("-", "").take(18)
 

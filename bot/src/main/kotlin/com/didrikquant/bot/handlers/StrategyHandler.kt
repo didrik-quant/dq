@@ -5,8 +5,8 @@ import com.didrikquant.core.OrderBook
 import com.didrikquant.core.disruptor.MutableEvent
 import com.didrikquant.execution.OrderManager
 import com.didrikquant.risk.KillSwitch
-import com.didrikquant.strategy.OrderIntent
 import com.didrikquant.strategy.Strategy
+import com.didrikquant.strategy.StrategyAction
 import com.lmax.disruptor.EventHandler
 import mu.KotlinLogging
 import java.util.concurrent.atomic.AtomicLong
@@ -22,7 +22,7 @@ public class StrategyHandler(
     private val requoteIntervalMs: Long,
 ) : EventHandler<MutableEvent> {
     private val lastQuoteTime = AtomicLong(0)
-    private val pendingIntents = AtomicReference<List<OrderIntent>>(emptyList())
+    private val pendingActions = AtomicReference<List<StrategyAction>>(emptyList())
 
     override fun onEvent(
         event: MutableEvent,
@@ -46,23 +46,24 @@ public class StrategyHandler(
                 }
 
                 val position = orderManager.getPosition()
-                val intents = try {
-                    strategy.onOrderBook(orderBook, position)
+                val openOrders = orderManager.getOpenOrders()
+                val actions = try {
+                    strategy.onOrderBook(orderBook, position, openOrders)
                 } catch (e: Exception) {
                     logger.error(e) { "Strategy error, triggering kill switch" }
                     killSwitch.manualTrigger("Strategy exception: ${e.message}")
                     return
                 }
 
-                if (intents.isNotEmpty()) {
-                    pendingIntents.set(intents)
+                if (actions.isNotEmpty()) {
+                    pendingActions.set(actions)
                     lastQuoteTime.set(now)
-                    logger.debug { "Strategy generated ${intents.size} intents at ${orderBook.midPrice}" }
+                    logger.debug { "Strategy generated ${actions.size} actions at ${orderBook.midPrice}" }
                 }
             }
             else -> {}
         }
     }
 
-    public fun consumeIntents(): List<OrderIntent> = pendingIntents.getAndSet(emptyList())
+    public fun consumeActions(): List<StrategyAction> = pendingActions.getAndSet(emptyList())
 }

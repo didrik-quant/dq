@@ -5,6 +5,7 @@ import com.didrikquant.core.disruptor.MutableEvent
 import com.didrikquant.execution.OrderManager
 import com.didrikquant.risk.RiskCheckResult
 import com.didrikquant.risk.RiskChecker
+import com.didrikquant.strategy.StrategyAction
 import com.lmax.disruptor.EventHandler
 import mu.KotlinLogging
 
@@ -21,39 +22,57 @@ public class RiskHandler(
         sequence: Long,
         endOfBatch: Boolean,
     ) {
-        val intents = strategyHandler.consumeIntents()
-        if (intents.isEmpty()) return
+        val actions = strategyHandler.consumeActions()
+        if (actions.isEmpty()) return
 
-        val approvedCommands = mutableListOf<Command>()
+        val commands = mutableListOf<Command>()
         val position = orderManager.getPosition()
-        val openOrders = orderManager.getOpenOrderCount()
+        val openOrderCount = orderManager.getOpenOrderCount()
 
-        for (intent in intents) {
-            when (val result = riskChecker.check(intent, position, openOrders)) {
-                is RiskCheckResult.Approved -> {
-                    val clOrdId = orderManager.generateClOrdId()
-                    orderManager.registerPendingOrder(clOrdId, intent.side, intent.price, intent.qty)
-
-                    approvedCommands.add(
-                        Command.PlaceOrder(
-                            clOrdId = clOrdId,
-                            symbol = symbol,
-                            side = intent.side,
-                            price = intent.price,
-                            qty = intent.qty,
-                            postOnly = intent.postOnly,
+        for (action in actions) {
+            when (action) {
+                is StrategyAction.Place -> {
+                    val intent = action.intent
+                    when (val result = riskChecker.check(intent, position, openOrderCount)) {
+                        is RiskCheckResult.Approved -> {
+                            val clOrdId = orderManager.generateClOrdId()
+                            orderManager.registerPendingOrder(clOrdId, intent.side, intent.price, intent.qty)
+                            commands.add(
+                                Command.PlaceOrder(
+                                    clOrdId = clOrdId,
+                                    symbol = symbol,
+                                    side = intent.side,
+                                    price = intent.price,
+                                    qty = intent.qty,
+                                    postOnly = intent.postOnly,
+                                ),
+                            )
+                            logger.info { "Place: ${intent.side} ${intent.qty} @ ${intent.price}" }
+                        }
+                        is RiskCheckResult.Rejected -> {
+                            logger.warn { "Risk rejected: ${result.reason}" }
+                        }
+                    }
+                }
+                is StrategyAction.Amend -> {
+                    commands.add(
+                        Command.AmendOrder(
+                            orderId = action.orderId,
+                            newPrice = action.newPrice,
+                            newQty = action.newQty,
                         ),
                     )
-                    logger.info { "Risk approved: ${intent.side} ${intent.qty} @ ${intent.price}" }
+                    logger.info { "Amend: ${action.orderId} -> ${action.newPrice}" }
                 }
-                is RiskCheckResult.Rejected -> {
-                    logger.warn { "Risk rejected: ${result.reason}" }
+                is StrategyAction.Cancel -> {
+                    commands.add(Command.CancelOrder(orderId = action.orderId))
+                    logger.info { "Cancel: ${action.orderId}" }
                 }
             }
         }
 
-        if (approvedCommands.isNotEmpty()) {
-            event.commands = approvedCommands
+        if (commands.isNotEmpty()) {
+            event.commands = commands
         }
     }
 }
