@@ -59,7 +59,7 @@ public class RiskHandler(
                             logger.info { "Place: ${intent.side} ${intent.qty} @ ${intent.price}" }
                         }
                         is RiskCheckResult.Rejected -> {
-                            logger.warn { "Risk rejected: ${result.reason}" }
+                            throw BotFatalException("RISK BREACH: ${result.reason}")
                         }
                     }
                 }

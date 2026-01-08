@@ -63,10 +63,15 @@ public class Harness(private val config: HarnessConfig) {
             val endTime = Instant.now()
 
             if (botResult.crashed) {
-                logger.error { "Bot crashed, logging failure" }
-                evolutionLog.appendFailure(epoch, diff, "RUNTIME_CRASH", botResult.error ?: "Unknown error")
-                commitEvolutionLog("Epoch $epoch: RUNTIME_CRASH")
-                // Don't merge crashed code back to main
+                val failureType = if (botResult.error?.contains("RISK BREACH") == true) {
+                    "RISK_BREACH"
+                } else {
+                    "RUNTIME_CRASH"
+                }
+                logger.error { "Bot failed: $failureType" }
+                evolutionLog.appendFailure(epoch, diff, failureType, botResult.error ?: "Unknown error")
+                commitEvolutionLog("Epoch $epoch: $failureType")
+                // Don't merge failed code back to main
                 return
             }
 
@@ -98,8 +103,26 @@ public class Harness(private val config: HarnessConfig) {
 
     private fun buildAgentPrompt(worktreePath: Path, epoch: Int): String {
         val lastFailure = evolutionLog.lastFailure()
-        val crashContext = if (lastFailure != null) {
+        val crashContext = when (lastFailure?.failureType) {
+            "RISK_BREACH" -> """
+            
+            CRITICAL: The previous epoch (${lastFailure.epoch}) was KILLED BY RISK CONTROL:
+            ```
+            ${lastFailure.error}
+            ```
+            
+            Your strategy violated risk limits. This typically means:
+            - Strategy is placing orders without checking existing open orders
+            - Orders are not being properly tracked or managed
+            - The strategy is generating too many actions per tick
+            
+            You MUST fix this before making any other improvements.
+            The changes that caused this:
+            ```diff
+            ${lastFailure.diff}
+            ```
             """
+            "BUILD_FAILED", "RUNTIME_CRASH" -> """
             
             CRITICAL: The previous epoch (${lastFailure.epoch}) CRASHED with error:
             ```
@@ -112,8 +135,7 @@ public class Harness(private val config: HarnessConfig) {
             ${lastFailure.diff}
             ```
             """
-        } else {
-            ""
+            else -> ""
         }
 
         return """
