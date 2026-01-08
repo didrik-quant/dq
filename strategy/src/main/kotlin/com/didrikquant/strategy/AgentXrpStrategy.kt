@@ -19,6 +19,10 @@ public class AgentXrpStrategy(
     private val amendThresholdBps: Int = 3,
     private val depthCheckQty: BigDecimal = BigDecimal("100"),
     private val maxSpreadWidenBps: Int = 4,
+    private val imbalanceDepthLevels: Int = 5,
+    private val imbalanceThreshold: BigDecimal = BigDecimal("0.3"),
+    private val imbalanceSpreadWidenBps: Int = 3,
+    private val imbalanceSizeReduction: BigDecimal = BigDecimal("0.5"),
 ) : Strategy {
     override fun onBookSnapshot(
         book: OrderBookSnapshot,
@@ -29,21 +33,24 @@ public class AgentXrpStrategy(
 
         val mid = book.midPrice ?: return emptyList()
 
-        // Market-aware spread: use the larger of market spread or our minimum
         val marketSpreadBps = book.spreadBps?.toInt() ?: minSpreadBps
         val baseSpreadBps = maxOf(marketSpreadBps, minSpreadBps)
+        val depthAdjustment = calculateDepthAdjustment(book, mid)
+        val baseAdaptiveSpreadBps = baseSpreadBps + spreadBufferBps + depthAdjustment
 
-        // Add buffer on top of market spread + depth adjustment
-        val adaptiveSpreadBps = baseSpreadBps + spreadBufferBps + calculateDepthAdjustment(book, mid)
+        val imbalance = calculateOrderBookImbalance(book)
+        val (bidSpreadAdjustBps, askSpreadAdjustBps) = calculateImbalanceSpreadAdjustment(imbalance)
 
-        val spreadDecimal =
-            BigDecimal(adaptiveSpreadBps).divide(BigDecimal("20000"), 8, RoundingMode.HALF_UP)
-        val halfSpread = mid * spreadDecimal
+        val bidSpreadBps = baseAdaptiveSpreadBps + bidSpreadAdjustBps
+        val askSpreadBps = baseAdaptiveSpreadBps + askSpreadAdjustBps
+
+        val bidSpreadDecimal = BigDecimal(bidSpreadBps).divide(BigDecimal("20000"), 8, RoundingMode.HALF_UP)
+        val askSpreadDecimal = BigDecimal(askSpreadBps).divide(BigDecimal("20000"), 8, RoundingMode.HALF_UP)
 
         val skew = position * skewFactor
 
-        val rawBidPrice = mid - halfSpread - skew
-        val rawAskPrice = mid + halfSpread - skew
+        val rawBidPrice = mid - (mid * bidSpreadDecimal) - skew
+        val rawAskPrice = mid + (mid * askSpreadDecimal) - skew
 
         val bidPrice = rawBidPrice.roundToTick(tickSize)
         val askPrice = rawAskPrice.roundToTick(tickSize)
@@ -57,9 +64,11 @@ public class AgentXrpStrategy(
         val longExposure = positionRatio.max(BigDecimal.ZERO)
         val shortExposure = positionRatio.min(BigDecimal.ZERO).abs()
 
-        val rawBidSize = orderSize * (BigDecimal.ONE - longExposure * inventoryScaleFactor)
+        val (bidSizeMultiplier, askSizeMultiplier) = calculateImbalanceSizeMultiplier(imbalance)
+
+        val rawBidSize = orderSize * (BigDecimal.ONE - longExposure * inventoryScaleFactor) * bidSizeMultiplier
         val bidSize = rawBidSize.setScale(0, RoundingMode.DOWN).max(minSizeAtLimit)
-        val rawAskSize = orderSize * (BigDecimal.ONE - shortExposure * inventoryScaleFactor)
+        val rawAskSize = orderSize * (BigDecimal.ONE - shortExposure * inventoryScaleFactor) * askSizeMultiplier
         val askSize = rawAskSize.setScale(0, RoundingMode.DOWN).max(minSizeAtLimit)
 
         val actions = mutableListOf<StrategyAction>()
@@ -137,5 +146,53 @@ public class AgentXrpStrategy(
         val depthRatio = minDepth.divide(depthCheckQty, 8, RoundingMode.HALF_UP)
         val widenFactor = BigDecimal.ONE - depthRatio
         return widenFactor.multiply(BigDecimal(maxSpreadWidenBps)).toInt()
+    }
+
+    private fun calculateOrderBookImbalance(book: OrderBookSnapshot): BigDecimal {
+        val topBids = book.topBids(imbalanceDepthLevels)
+        val topAsks = book.topAsks(imbalanceDepthLevels)
+
+        val bidVolume = topBids.sumOf { it.qty }
+        val askVolume = topAsks.sumOf { it.qty }
+        val totalVolume = bidVolume + askVolume
+
+        if (totalVolume <= BigDecimal.ZERO) return BigDecimal.ZERO
+
+        return (bidVolume - askVolume).divide(totalVolume, 8, RoundingMode.HALF_UP)
+    }
+
+    private fun calculateImbalanceSpreadAdjustment(imbalance: BigDecimal): Pair<Int, Int> {
+        val absImbalance = imbalance.abs()
+        if (absImbalance < imbalanceThreshold) return Pair(0, 0)
+
+        val adjustmentBps = absImbalance
+            .subtract(imbalanceThreshold)
+            .divide(BigDecimal.ONE - imbalanceThreshold, 8, RoundingMode.HALF_UP)
+            .multiply(BigDecimal(imbalanceSpreadWidenBps))
+            .toInt()
+
+        return if (imbalance > BigDecimal.ZERO) {
+            Pair(0, adjustmentBps)
+        } else {
+            Pair(adjustmentBps, 0)
+        }
+    }
+
+    private fun calculateImbalanceSizeMultiplier(imbalance: BigDecimal): Pair<BigDecimal, BigDecimal> {
+        val absImbalance = imbalance.abs()
+        if (absImbalance < imbalanceThreshold) return Pair(BigDecimal.ONE, BigDecimal.ONE)
+
+        val reductionFactor = absImbalance
+            .subtract(imbalanceThreshold)
+            .divide(BigDecimal.ONE - imbalanceThreshold, 8, RoundingMode.HALF_UP)
+            .multiply(imbalanceSizeReduction)
+
+        val reducedMultiplier = BigDecimal.ONE - reductionFactor
+
+        return if (imbalance > BigDecimal.ZERO) {
+            Pair(BigDecimal.ONE, reducedMultiplier)
+        } else {
+            Pair(reducedMultiplier, BigDecimal.ONE)
+        }
     }
 }
