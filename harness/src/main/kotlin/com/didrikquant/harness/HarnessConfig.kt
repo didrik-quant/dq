@@ -7,6 +7,7 @@ import java.util.Properties
 public data class HarnessConfig(
     val instrument: String,
     val epochDurationMs: Long = 3_600_000L,
+    val gracePeriodMs: Long = 60_000L,
     val strategyClass: String,
     val repoRoot: Path,
     val opencodeHost: String = "127.0.0.1",
@@ -28,6 +29,7 @@ public data class HarnessConfig(
 
             val instrument = get("HARNESS_INSTRUMENT") ?: "PF_XRPUSD"
             val epochDurationMs = get("HARNESS_EPOCH_DURATION_MS")?.toLongOrNull() ?: 3_600_000L
+            val gracePeriodMs = get("HARNESS_GRACE_PERIOD_MS")?.toLongOrNull() ?: 60_000L
             val strategyClass = get("HARNESS_STRATEGY_CLASS") ?: deriveStrategyClass(instrument)
             val opencodeHost = get("OPENCODE_HOST") ?: "127.0.0.1"
             val opencodePort = get("OPENCODE_PORT")?.toIntOrNull() ?: 4096
@@ -40,6 +42,7 @@ public data class HarnessConfig(
             return HarnessConfig(
                 instrument = instrument,
                 epochDurationMs = epochDurationMs,
+                gracePeriodMs = gracePeriodMs,
                 strategyClass = strategyClass,
                 repoRoot = repoRoot,
                 opencodeHost = opencodeHost,

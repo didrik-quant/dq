@@ -5,6 +5,7 @@ import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.Instant
+import java.util.concurrent.TimeUnit
 
 private val logger = KotlinLogging.logger {}
 
@@ -184,7 +185,16 @@ public class Harness(private val config: HarnessConfig) {
         config.krakenApiSecret?.let { processBuilder.environment()["KRAKEN_API_SECRET"] = it }
 
         val process = processBuilder.start()
-        val exitCode = process.waitFor()
+        val timeoutMs = config.epochDurationMs + config.gracePeriodMs
+        val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
+
+        if (!completed) {
+            logger.warn { "Bot did not exit within timeout, killing process" }
+            process.destroyForcibly()
+            process.waitFor(10, TimeUnit.SECONDS)
+        }
+
+        val exitCode = process.exitValue()
         logger.info { "Bot exited with code: $exitCode" }
 
         val output = Files.readString(logFile)
