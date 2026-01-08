@@ -84,6 +84,6 @@ private class NamedThreadFactory(private val prefix: String) : ThreadFactory {
 
     override fun newThread(r: Runnable): Thread =
         Thread(r, "$prefix-${counter.incrementAndGet()}").apply {
-            isDaemon = true
+            isDaemon = false
         }
 }
