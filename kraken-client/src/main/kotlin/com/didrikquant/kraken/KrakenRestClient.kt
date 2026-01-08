@@ -56,8 +56,8 @@ public class KrakenRestClient(private val config: KrakenConfig) {
         return authenticatedPost("/sendorder", params)
     }
 
-    public suspend fun cancelOrder(orderId: String): JsonObject {
-        return authenticatedPost("/cancelorder", "order_id=$orderId")
+    public suspend fun cancelOrder(clOrdId: String): JsonObject {
+        return authenticatedPost("/cancelorder", "cliOrdId=$clOrdId")
     }
 
     public suspend fun cancelAllOrders(symbol: String? = null): JsonObject {
@@ -66,12 +66,12 @@ public class KrakenRestClient(private val config: KrakenConfig) {
     }
 
     public suspend fun editOrder(
-        orderId: String,
+        clOrdId: String,
         limitPrice: Double? = null,
         size: Double? = null,
     ): JsonObject {
         val params = buildString {
-            append("orderId=$orderId")
+            append("cliOrdId=$clOrdId")
             limitPrice?.let { append("&limitPrice=$it") }
             size?.let { append("&size=$it") }
         }

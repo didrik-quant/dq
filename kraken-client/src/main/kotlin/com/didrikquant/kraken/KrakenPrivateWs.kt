@@ -235,21 +235,21 @@ public class KrakenPrivateWs(
     }
 
     private suspend fun cancelOrder(cmd: Command.CancelOrder) {
-        val response = restClient.cancelOrder(cmd.orderId)
+        val response = restClient.cancelOrder(cmd.clOrdId)
         val result = response["result"]?.jsonPrimitive?.contentOrNull
         if (result == "success") {
-            logger.info { "Order canceled: ${cmd.orderId}" }
+            logger.info { "Order canceled: ${cmd.clOrdId}" }
             publishEvent(
                 Event.OrderCanceled(
-                    orderId = cmd.orderId,
-                    clOrdId = "",
+                    orderId = "",
+                    clOrdId = cmd.clOrdId,
                     reason = "user_requested",
                     timestamp = System.currentTimeMillis(),
                 ),
             )
         } else {
             val error = response["error"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
-            logger.error { "Cancel failed for ${cmd.orderId}: $error" }
+            logger.error { "Cancel failed for ${cmd.clOrdId}: $error" }
         }
     }
 
@@ -265,20 +265,20 @@ public class KrakenPrivateWs(
 
     private suspend fun amendOrder(cmd: Command.AmendOrder) {
         val response = restClient.editOrder(
-            orderId = cmd.orderId,
+            clOrdId = cmd.clOrdId,
             limitPrice = cmd.newPrice.toDouble(),
             size = cmd.newQty?.toDouble(),
         )
         val result = response["result"]?.jsonPrimitive?.contentOrNull
         if (result == "success") {
             val editStatus = response["editStatus"]?.jsonObject
-            val newOrderId = editStatus?.get("orderId")?.jsonPrimitive?.contentOrNull ?: cmd.orderId
-            logger.info { "Order amended: ${cmd.orderId} -> $newOrderId, price=${cmd.newPrice}" }
+            val newOrderId = editStatus?.get("orderId")?.jsonPrimitive?.contentOrNull ?: ""
+            logger.info { "Order amended: ${cmd.clOrdId} -> $newOrderId, price=${cmd.newPrice}" }
             publishEvent(
                 Event.OrderAmended(
-                    oldOrderId = cmd.orderId,
+                    oldOrderId = "",
                     newOrderId = newOrderId,
-                    clOrdId = "",
+                    clOrdId = cmd.clOrdId,
                     newPrice = cmd.newPrice,
                     newQty = cmd.newQty,
                     timestamp = System.currentTimeMillis(),
@@ -286,7 +286,7 @@ public class KrakenPrivateWs(
             )
         } else {
             val error = response["error"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
-            logger.error { "Amend failed for ${cmd.orderId}: $error" }
+            logger.error { "Amend failed for ${cmd.clOrdId}: $error" }
         }
     }
 

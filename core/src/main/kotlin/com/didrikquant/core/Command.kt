@@ -15,11 +15,11 @@ public sealed class Command {
     ) : Command()
 
     public data class CancelOrder(
-        val orderId: String,
+        val clOrdId: String,
     ) : Command()
 
     public data class AmendOrder(
-        val orderId: String,
+        val clOrdId: String,
         val newPrice: BigDecimal,
         val newQty: BigDecimal? = null,
     ) : Command()

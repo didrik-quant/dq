@@ -66,16 +66,16 @@ public class RiskHandler(
                 is StrategyAction.Amend -> {
                     commands.add(
                         Command.AmendOrder(
-                            orderId = action.orderId,
+                            clOrdId = action.clOrdId,
                             newPrice = action.newPrice,
                             newQty = action.newQty,
                         ),
                     )
-                    logger.info { "Amend: ${action.orderId} -> ${action.newPrice}" }
+                    logger.info { "Amend: ${action.clOrdId} -> ${action.newPrice}" }
                 }
                 is StrategyAction.Cancel -> {
-                    commands.add(Command.CancelOrder(orderId = action.orderId))
-                    logger.info { "Cancel: ${action.orderId}" }
+                    commands.add(Command.CancelOrder(clOrdId = action.clOrdId))
+                    logger.info { "Cancel: ${action.clOrdId}" }
                 }
             }
         }

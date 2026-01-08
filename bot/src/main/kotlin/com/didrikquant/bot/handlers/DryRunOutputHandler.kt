@@ -46,13 +46,13 @@ public class DryRunOutputHandler : CommandOutputHandler {
                     }
                 }
                 is Command.CancelOrder -> {
-                    logger.info { "[DRY-RUN] Would cancel: ${cmd.orderId}" }
+                    logger.info { "[DRY-RUN] Would cancel: ${cmd.clOrdId}" }
                 }
                 is Command.CancelAll -> {
                     logger.info { "[DRY-RUN] Would cancel all orders for ${cmd.symbol ?: "all symbols"}" }
                 }
                 is Command.AmendOrder -> {
-                    logger.info { "[DRY-RUN] Would amend: ${cmd.orderId}" }
+                    logger.info { "[DRY-RUN] Would amend: ${cmd.clOrdId} -> ${cmd.newPrice}" }
                 }
             }
         }

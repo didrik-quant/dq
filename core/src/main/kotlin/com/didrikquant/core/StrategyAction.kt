@@ -16,12 +16,12 @@ public sealed class StrategyAction {
     ) : StrategyAction()
 
     public data class Amend(
-        val orderId: String,
+        val clOrdId: String,
         val newPrice: BigDecimal,
         val newQty: BigDecimal? = null,
     ) : StrategyAction()
 
     public data class Cancel(
-        val orderId: String,
+        val clOrdId: String,
     ) : StrategyAction()
 }

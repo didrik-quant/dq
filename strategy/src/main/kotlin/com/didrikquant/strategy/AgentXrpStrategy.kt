@@ -107,7 +107,7 @@ public class AgentXrpStrategy(
 
         if (isOrderCrossed(existing, mid)) {
             logger.info { "$side: CANCEL crossed order ${existing.price} vs mid $mid" }
-            return listOf(StrategyAction.Cancel(existing.orderId))
+            return listOf(StrategyAction.Cancel(existing.clOrdId))
         }
 
         if (existing.isPartiallyFilled()) {
@@ -119,7 +119,7 @@ public class AgentXrpStrategy(
 
         if (driftBps > amendThresholdBps) {
             logger.info { "$side: AMEND ${existing.price} -> $targetPrice (${driftBps}bps drift)" }
-            return listOf(StrategyAction.Amend(existing.orderId, targetPrice))
+            return listOf(StrategyAction.Amend(existing.clOrdId, targetPrice))
         }
 
         return emptyList()

@@ -33,7 +33,7 @@ public class ExecutionSimulator(
                     qty = command.qty,
                     createdAt = currentTimestamp,
                 )
-                pendingOrders[orderId] = order
+                pendingOrders[command.clOrdId] = order
 
                 publishEvent(
                     Event.OrderAccepted(
@@ -51,7 +51,7 @@ public class ExecutionSimulator(
             }
 
             is Command.CancelOrder -> {
-                val order = pendingOrders.remove(command.orderId)
+                val order = pendingOrders.remove(command.clOrdId)
                 if (order != null) {
                     publishEvent(
                         Event.OrderCanceled(
@@ -61,7 +61,7 @@ public class ExecutionSimulator(
                             timestamp = currentTimestamp,
                         ),
                     )
-                    logger.debug { "Simulated order canceled: ${order.orderId}" }
+                    logger.debug { "Simulated order canceled: ${order.clOrdId}" }
                 }
             }
 
@@ -70,7 +70,7 @@ public class ExecutionSimulator(
                     command.symbol == null || order.symbol == command.symbol
                 }
                 ordersToCancel.forEach { order ->
-                    pendingOrders.remove(order.orderId)
+                    pendingOrders.remove(order.clOrdId)
                     publishEvent(
                         Event.OrderCanceled(
                             orderId = order.orderId,
@@ -86,7 +86,22 @@ public class ExecutionSimulator(
             }
 
             is Command.AmendOrder -> {
-                logger.debug { "Amend not implemented in simulator" }
+                val order = pendingOrders[command.clOrdId]
+                if (order != null) {
+                    val amendedOrder = order.copy(price = command.newPrice)
+                    pendingOrders[command.clOrdId] = amendedOrder
+                    publishEvent(
+                        Event.OrderAmended(
+                            oldOrderId = order.orderId,
+                            newOrderId = order.orderId,
+                            clOrdId = order.clOrdId,
+                            newPrice = command.newPrice,
+                            newQty = command.newQty,
+                            timestamp = currentTimestamp,
+                        ),
+                    )
+                    logger.debug { "Simulated order amended: ${order.clOrdId} -> ${command.newPrice}" }
+                }
             }
         }
     }
@@ -95,7 +110,7 @@ public class ExecutionSimulator(
         val fills = fillModel.checkFills(pendingOrders.values, book, currentTimestamp)
 
         for (fill in fills) {
-            pendingOrders.remove(fill.order.orderId)
+            pendingOrders.remove(fill.order.clOrdId)
 
             publishEvent(
                 Event.OrderFill(
