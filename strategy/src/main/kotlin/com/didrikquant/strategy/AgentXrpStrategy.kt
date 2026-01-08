@@ -14,6 +14,8 @@ public class AgentXrpStrategy(
     private val tickSize: BigDecimal = BigDecimal("0.00001"),
     private val maxPosition: BigDecimal = BigDecimal("75"),
     private val amendThresholdBps: Int = 3,
+    private val depthCheckQty: BigDecimal = BigDecimal("100"),
+    private val maxSpreadWidenBps: Int = 4,
 ) : Strategy {
     override fun onOrderBook(
         book: OrderBook,
@@ -24,8 +26,11 @@ public class AgentXrpStrategy(
 
         val mid = book.midPrice ?: return emptyList()
 
+        // Adaptive spread: widen when top-of-book depth is thin
+        val adaptiveSpreadBps = spreadBps + calculateDepthAdjustment(book, mid)
+
         val spreadDecimal =
-            BigDecimal(spreadBps).divide(BigDecimal("20000"), 8, RoundingMode.HALF_UP)
+            BigDecimal(adaptiveSpreadBps).divide(BigDecimal("20000"), 8, RoundingMode.HALF_UP)
         val halfSpread = mid * spreadDecimal
 
         val skew = position * skewFactor
@@ -107,5 +112,23 @@ public class AgentXrpStrategy(
         val diff = (currentPrice - targetPrice).abs()
         val bpsDecimal = diff.divide(mid, 8, RoundingMode.HALF_UP)
         return bpsDecimal.multiply(BigDecimal("10000")).toInt()
+    }
+
+    private fun calculateDepthAdjustment(
+        book: OrderBook,
+        mid: BigDecimal,
+    ): Int {
+        val topBids = book.topBids(5)
+        val topAsks = book.topAsks(5)
+
+        val bidDepth = topBids.sumOf { it.qty }
+        val askDepth = topAsks.sumOf { it.qty }
+        val minDepth = bidDepth.min(askDepth)
+
+        if (minDepth >= depthCheckQty) return 0
+
+        val depthRatio = minDepth.divide(depthCheckQty, 8, RoundingMode.HALF_UP)
+        val widenFactor = BigDecimal.ONE - depthRatio
+        return widenFactor.multiply(BigDecimal(maxSpreadWidenBps)).toInt()
     }
 }
