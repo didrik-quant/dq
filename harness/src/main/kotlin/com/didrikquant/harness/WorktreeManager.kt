@@ -19,11 +19,27 @@ public class WorktreeManager(private val repoRoot: Path) {
             delete(worktreePath, branchName)
         }
 
+        cleanup(branchName)
+
         logger.info { "Creating worktree: $branchName at $worktreePath" }
 
         exec(repoRoot, "git", "worktree", "add", "-b", branchName, worktreePath.toString(), "main")
 
         return worktreePath
+    }
+
+    private fun cleanup(branchName: String) {
+        execQuiet(repoRoot, "git", "worktree", "prune")
+        execQuiet(repoRoot, "git", "branch", "-D", branchName)
+    }
+
+    private fun execQuiet(workDir: Path, vararg command: String) {
+        val process = ProcessBuilder(*command)
+            .directory(workDir.toFile())
+            .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+            .redirectError(ProcessBuilder.Redirect.DISCARD)
+            .start()
+        process.waitFor()
     }
 
     public fun diff(worktreePath: Path): String {

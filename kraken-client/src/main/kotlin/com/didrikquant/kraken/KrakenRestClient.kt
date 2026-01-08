@@ -66,30 +66,29 @@ public class KrakenRestClient(private val config: KrakenConfig) {
     }
 
     private suspend fun authenticatedGet(endpoint: String): JsonObject {
-        val nonce = KrakenAuth.generateNonce()
-        val postData = "nonce=$nonce"
-        val authent = KrakenAuth.signRequest(postData, config.apiSecret, nonce)
+        val postData = ""
+        val endpointPath = "/api/v3$endpoint"
+        val authent = KrakenAuth.signRequest(postData, config.apiSecret, endpointPath)
 
         val response: HttpResponse = client.get("${config.restUrl}$endpoint") {
             header("APIKey", config.apiKey)
             header("Authent", authent)
-            header("Nonce", nonce)
         }
 
         return json.parseToJsonElement(response.bodyAsText()).jsonObject
     }
 
     private suspend fun authenticatedPost(endpoint: String, postData: String): JsonObject {
-        val nonce = KrakenAuth.generateNonce()
-        val fullPostData = if (postData.isEmpty()) "nonce=$nonce" else "$postData&nonce=$nonce"
-        val authent = KrakenAuth.signRequest(fullPostData, config.apiSecret, nonce)
+        val endpointPath = "/api/v3$endpoint"
+        val authent = KrakenAuth.signRequest(postData, config.apiSecret, endpointPath)
 
         val response: HttpResponse = client.post("${config.restUrl}$endpoint") {
             contentType(ContentType.Application.FormUrlEncoded)
             header("APIKey", config.apiKey)
             header("Authent", authent)
-            header("Nonce", nonce)
-            setBody(fullPostData)
+            if (postData.isNotEmpty()) {
+                setBody(postData)
+            }
         }
 
         return json.parseToJsonElement(response.bodyAsText()).jsonObject

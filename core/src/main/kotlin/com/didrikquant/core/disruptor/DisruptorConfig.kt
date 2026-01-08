@@ -27,8 +27,12 @@ public object DisruptorConfig {
             BusySpinWaitStrategy(),
         )
 
-        @Suppress("SpreadOperator")
-        disruptor.handleEventsWith(*handlers)
+        if (handlers.isNotEmpty()) {
+            var group = disruptor.handleEventsWith(handlers[0])
+            for (i in 1 until handlers.size) {
+                group = group.then(handlers[i])
+            }
+        }
 
         return disruptor
     }

@@ -33,6 +33,10 @@ public class KrakenPublicWs(
 
     private var session: WebSocketSession? = null
     private var job: Job? = null
+    @Volatile
+    private var ready: Boolean = false
+
+    public fun isReady(): Boolean = ready
 
     public suspend fun connect(scope: CoroutineScope) {
         job = scope.launch {
@@ -44,10 +48,13 @@ public class KrakenPublicWs(
                         publishEvent(Event.Connected(ConnectionType.PUBLIC, System.currentTimeMillis()))
 
                         subscribeToBook()
+                        ready = true
+                        logger.info { "Public WS ready" }
                         handleMessages()
                     }
                 } catch (e: Exception) {
                     logger.error(e) { "Futures WS error" }
+                    ready = false
                     publishEvent(
                         Event.Disconnected(
                             ConnectionType.PUBLIC,
@@ -57,6 +64,7 @@ public class KrakenPublicWs(
                     )
                 }
 
+                ready = false
                 logger.info { "Reconnecting Futures WS in 5 seconds..." }
                 delay(5000)
             }

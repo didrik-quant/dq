@@ -7,6 +7,11 @@ import com.didrikquant.kraken.KrakenPublicWs
 import com.didrikquant.kraken.KrakenRestClient
 import com.didrikquant.replay.recorder.RecorderConfig
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.json.contentOrNull
+import kotlinx.serialization.json.doubleOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -58,12 +63,30 @@ public fun main(args: Array<String>): Unit =
         val restClient: KrakenRestClient? = if (dryRun) null else KrakenRestClient(krakenConfig)
 
         if (!dryRun && restClient != null) {
-            logger.info { "Fetching account info..." }
+            logger.info { "Verifying API credentials..." }
             try {
                 val accounts = restClient.getAccounts()
-                logger.info { "Accounts: $accounts" }
+                val result = accounts["result"]?.jsonPrimitive?.contentOrNull
+                if (result != "success") {
+                    val error = accounts["error"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
+                    logger.error { "API authentication failed: $error" }
+                    restClient.close()
+                    return@runBlocking
+                }
+                val accountsData = accounts["accounts"]?.jsonObject
+                if (accountsData == null) {
+                    logger.error { "No accounts found" }
+                    restClient.close()
+                    return@runBlocking
+                }
+                // Use multi-collateral "flex" account portfolio value
+                val flexAccount = accountsData["flex"]?.jsonObject
+                val balance = flexAccount?.get("portfolioValue")?.jsonPrimitive?.doubleOrNull ?: 0.0
+                logger.info { "API verified. Account portfolio value: ${"%.2f".format(balance)} USD" }
             } catch (e: Exception) {
-                logger.error(e) { "Failed to fetch accounts" }
+                logger.error(e) { "Failed to verify API credentials" }
+                restClient.close()
+                return@runBlocking
             }
         }
 
@@ -85,6 +108,31 @@ public fun main(args: Array<String>): Unit =
         privateWs?.connect(scope)
 
         logger.info { "Futures WebSocket connections initiated" }
+
+        logger.info { "Waiting for WebSocket connections to be ready..." }
+        val connectTimeout = 30_000L
+        val connectStart = System.currentTimeMillis()
+        while (true) {
+            val publicReady = publicWs.isReady()
+            val privateReady = dryRun || (privateWs?.isReady() == true)
+
+            if (publicReady && privateReady) {
+                logger.info { "All WebSocket connections ready" }
+                break
+            }
+
+            if (System.currentTimeMillis() - connectStart > connectTimeout) {
+                logger.error { "Timeout waiting for WebSocket connections" }
+                publicWs.close()
+                privateWs?.close()
+                pipeline.stop()
+                restClient?.close()
+                scope.cancel()
+                return@runBlocking
+            }
+
+            delay(100)
+        }
 
         val startTimeMs = System.currentTimeMillis()
 
@@ -111,6 +159,10 @@ public fun main(args: Array<String>): Unit =
         if (!dryRun && privateWs != null) {
             scope.launch {
                 while (isActive) {
+                    if (!privateWs.isReady()) {
+                        delay(100)
+                        continue
+                    }
                     val commands = pipeline.outputHandler.drainCommands()
                     for (cmd in commands) {
                         privateWs.sendCommand(cmd)
@@ -144,6 +196,20 @@ public fun main(args: Array<String>): Unit =
 
         while (scope.isActive) {
             delay(1000)
+
+            if (!publicWs.isReady()) {
+                logger.error { "Public WS disconnected, ending epoch early" }
+                if (!dryRun && privateWs != null && privateWs.isReady()) {
+                    privateWs.sendCommand(Command.CancelAll(botConfig.symbol))
+                    delay(500)
+                }
+                break
+            }
+
+            if (!dryRun && privateWs != null && !privateWs.isReady()) {
+                logger.error { "Private WS disconnected, ending epoch early" }
+                break
+            }
 
             if (pipeline.killSwitch.isTriggered()) {
                 logger.error { "KILL SWITCH TRIGGERED: ${pipeline.killSwitch.getTriggerReason()}" }

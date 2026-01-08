@@ -25,6 +25,7 @@ public class KrakenPrivateWs(
     private val json = Json {
         ignoreUnknownKeys = true
         isLenient = true
+        encodeDefaults = true
     }
 
     private val client = HttpClient(CIO) {
@@ -34,8 +35,14 @@ public class KrakenPrivateWs(
     private var session: WebSocketSession? = null
     private var job: Job? = null
     private var challenge: String? = null
+    @Volatile
+    private var ready: Boolean = false
+    private val subscribedFeeds = mutableSetOf<String>()
+    private val requiredFeeds = setOf("fills", "open_orders", "open_positions")
 
     private val commandChannel = Channel<Command>(Channel.BUFFERED)
+
+    public fun isReady(): Boolean = ready
 
     public suspend fun connect(scope: CoroutineScope) {
         job = scope.launch {
@@ -49,17 +56,27 @@ public class KrakenPrivateWs(
                         handleInitialMessages()
 
                         if (challenge != null) {
+                            subscribedFeeds.clear()
                             subscribeToFeeds()
-                            publishEvent(Event.Connected(ConnectionType.PRIVATE, System.currentTimeMillis()))
+                            waitForSubscriptions()
 
-                            coroutineScope {
-                                launch { handleMessages() }
-                                launch { processCommands() }
+                            if (subscribedFeeds.containsAll(requiredFeeds)) {
+                                ready = true
+                                logger.info { "Private WS ready to send orders" }
+                                publishEvent(Event.Connected(ConnectionType.PRIVATE, System.currentTimeMillis()))
+
+                                coroutineScope {
+                                    launch { handleMessages() }
+                                    launch { processCommands() }
+                                }
+                            } else {
+                                logger.error { "Failed to subscribe to all feeds. Got: $subscribedFeeds, needed: $requiredFeeds" }
                             }
                         }
                     }
                 } catch (e: Exception) {
                     logger.error(e) { "Private Futures WS error" }
+                    ready = false
                     publishEvent(
                         Event.Disconnected(
                             ConnectionType.PRIVATE,
@@ -69,6 +86,7 @@ public class KrakenPrivateWs(
                     )
                 }
 
+                ready = false
                 logger.info { "Reconnecting private Futures WS in 5 seconds..." }
                 delay(5000)
             }
@@ -77,7 +95,9 @@ public class KrakenPrivateWs(
 
     private suspend fun WebSocketSession.requestChallenge() {
         val request = WsChallengeRequest(apiKey = config.apiKey)
-        send(json.encodeToString(request))
+        val requestJson = json.encodeToString(request)
+        logger.debug { "Sending challenge request: $requestJson" }
+        send(requestJson)
         logger.info { "Requested challenge" }
     }
 
@@ -86,12 +106,13 @@ public class KrakenPrivateWs(
             for (frame in incoming) {
                 if (frame is Frame.Text) {
                     val text = frame.readText()
+                    logger.debug { "Private WS received: $text" }
                     val obj = json.parseToJsonElement(text).jsonObject
                     val event = obj["event"]?.jsonPrimitive?.contentOrNull
 
                     if (event == "challenge") {
                         challenge = obj["message"]?.jsonPrimitive?.contentOrNull
-                        logger.info { "Received challenge" }
+                        logger.info { "Received challenge: $challenge" }
                         return@withTimeoutOrNull true
                     } else if (event == "error") {
                         logger.error { "Challenge error: $text" }
@@ -109,16 +130,47 @@ public class KrakenPrivateWs(
     private suspend fun WebSocketSession.subscribeToFeeds() {
         val signedChallenge = KrakenAuth.signChallenge(challenge!!, config.apiSecret)
 
-        val feeds = listOf("fills", "open_orders", "open_positions")
-        for (feed in feeds) {
+        for (feed in requiredFeeds) {
             val request = WsAuthSubscribeRequest(
                 feed = feed,
                 apiKey = config.apiKey,
                 originalChallenge = challenge!!,
                 signedChallenge = signedChallenge,
             )
-            send(json.encodeToString(request))
-            logger.info { "Subscribed to $feed" }
+            val requestJson = json.encodeToString(request)
+            logger.debug { "Sending subscribe request: $requestJson" }
+            send(requestJson)
+            logger.info { "Subscribing to $feed" }
+        }
+    }
+
+    private suspend fun WebSocketSession.waitForSubscriptions() {
+        val timeout = withTimeoutOrNull(10000) {
+            for (frame in incoming) {
+                if (frame is Frame.Text) {
+                    val text = frame.readText()
+                    logger.debug { "Private WS received: $text" }
+                    val obj = json.parseToJsonElement(text).jsonObject
+                    val event = obj["event"]?.jsonPrimitive?.contentOrNull
+
+                    if (event == "subscribed") {
+                        val feed = obj["feed"]?.jsonPrimitive?.contentOrNull
+                        if (feed != null) {
+                            subscribedFeeds.add(feed)
+                            logger.info { "Subscription confirmed: $feed" }
+                        }
+                        if (subscribedFeeds.containsAll(requiredFeeds)) {
+                            return@withTimeoutOrNull true
+                        }
+                    } else if (event == "error") {
+                        logger.error { "Subscription error: $text" }
+                    }
+                }
+            }
+            false
+        }
+        if (timeout != true) {
+            logger.error { "Timeout waiting for subscription confirmations" }
         }
     }
 
@@ -127,6 +179,7 @@ public class KrakenPrivateWs(
             when (frame) {
                 is Frame.Text -> {
                     val text = frame.readText()
+                    logger.debug { "Private WS received: $text" }
                     processMessage(text)
                 }
                 is Frame.Ping -> send(Frame.Pong(frame.data))

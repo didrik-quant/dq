@@ -20,8 +20,8 @@ public object KrakenAuth {
         return Base64.getEncoder().encodeToString(hmacDigest)
     }
 
-    public fun signRequest(postData: String, apiSecret: String, nonce: String = ""): String {
-        val dataToSign = postData + nonce
+    public fun signRequest(postData: String, apiSecret: String, endpointPath: String): String {
+        val dataToSign = postData + endpointPath
         val sha256 = MessageDigest.getInstance("SHA-256")
         val hash = sha256.digest(dataToSign.toByteArray(Charsets.UTF_8))
 
