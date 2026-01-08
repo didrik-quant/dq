@@ -90,6 +90,9 @@ public class Pipeline(
         disruptor =
             DisruptorConfig.createDisruptor(
                 handlers = handlers.toTypedArray(),
+                onError = { ex ->
+                    killSwitch.manualTrigger("Disruptor exception: ${ex.message}")
+                },
             )
 
         disruptor.start()

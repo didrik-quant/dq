@@ -54,8 +54,15 @@ public class Harness(private val config: HarnessConfig) {
             }
 
             val startTime = Instant.now()
-            runBot(worktreePath)
+            val botResult = runBot(worktreePath)
             val endTime = Instant.now()
+
+            if (botResult.crashed) {
+                logger.error { "Bot crashed, logging failure" }
+                evolutionLog.appendFailure(epoch, diff, "RUNTIME_CRASH", botResult.error ?: "Unknown error")
+                // Don't merge crashed code back to main
+                return
+            }
 
             evolutionLog.append(epoch, startTime, endTime, diff, BigDecimal.ZERO)
 
@@ -84,6 +91,25 @@ public class Harness(private val config: HarnessConfig) {
     }
 
     private fun buildAgentPrompt(worktreePath: Path, epoch: Int): String {
+        val lastFailure = evolutionLog.lastFailure()
+        val crashContext = if (lastFailure != null) {
+            """
+            
+            CRITICAL: The previous epoch (${lastFailure.epoch}) CRASHED with error:
+            ```
+            ${lastFailure.error}
+            ```
+            
+            You MUST fix this crash before making any other improvements.
+            The crash was caused by:
+            ```diff
+            ${lastFailure.diff}
+            ```
+            """
+        } else {
+            ""
+        }
+
         return """
             You are a trading strategy developer. Your task is to improve the strategy for ${config.instrument}.
             
@@ -94,7 +120,7 @@ public class Harness(private val config: HarnessConfig) {
             - Evolution log: agents/${config.instrument}/evolution.md
 
             Read the evolution log to understand the history of changes and their results.
-
+            $crashContext
             TOOLS:
             - `dq fills` - View fills from last epoch
             - `dq book --at <timestamp>` - View order book at a specific timestamp
@@ -110,6 +136,7 @@ public class Harness(private val config: HarnessConfig) {
     }
 
     private data class BuildResult(val success: Boolean, val error: String? = null)
+    private data class BotResult(val crashed: Boolean, val exitCode: Int, val error: String? = null)
 
     private fun build(worktreePath: Path): BuildResult {
         logger.info { "Building bot in $worktreePath" }
@@ -138,8 +165,10 @@ public class Harness(private val config: HarnessConfig) {
         return errorLines.ifEmpty { "Build failed with unknown error" }
     }
 
-    private fun runBot(worktreePath: Path) {
+    private fun runBot(worktreePath: Path): BotResult {
         logger.info { "Running bot for ${config.epochDurationMs}ms" }
+
+        val logFile = Files.createTempFile("bot-output", ".log")
 
         val args = listOf(
             "bazel", "run", "//bot", "--",
@@ -148,7 +177,8 @@ public class Harness(private val config: HarnessConfig) {
         )
         val processBuilder = ProcessBuilder(args)
             .directory(worktreePath.toFile())
-            .inheritIO()
+            .redirectErrorStream(true)
+            .redirectOutput(logFile.toFile())
 
         config.krakenApiKey?.let { processBuilder.environment()["KRAKEN_API_KEY"] = it }
         config.krakenApiSecret?.let { processBuilder.environment()["KRAKEN_API_SECRET"] = it }
@@ -156,5 +186,25 @@ public class Harness(private val config: HarnessConfig) {
         val process = processBuilder.start()
         val exitCode = process.waitFor()
         logger.info { "Bot exited with code: $exitCode" }
+
+        val output = Files.readString(logFile)
+        Files.deleteIfExists(logFile)
+
+        return if (exitCode != 0) {
+            val error = extractCrashError(output)
+            BotResult(crashed = true, exitCode = exitCode, error = error)
+        } else {
+            BotResult(crashed = false, exitCode = exitCode)
+        }
+    }
+
+    private fun extractCrashError(output: String): String {
+        val lines = output.lines()
+        val exceptionStart = lines.indexOfFirst { it.contains("Exception") || it.contains("Error:") }
+        return if (exceptionStart >= 0) {
+            lines.drop(exceptionStart).take(15).joinToString("\n")
+        } else {
+            lines.takeLast(20).joinToString("\n")
+        }
     }
 }

@@ -8,6 +8,8 @@ import java.time.Instant
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
+public data class EpochFailure(val epoch: Int, val failureType: String, val error: String, val diff: String)
+
 public class EvolutionLog(private val logPath: Path) {
 
     private val formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneOffset.UTC)
@@ -95,5 +97,27 @@ public class EvolutionLog(private val logPath: Path) {
         val content = Files.readString(logPath)
         val regex = Regex("""## Epoch (\d+)""")
         return regex.findAll(content).mapNotNull { it.groupValues[1].toIntOrNull() }.maxOrNull() ?: 0
+    }
+
+    public fun lastFailure(): EpochFailure? {
+        if (!Files.exists(logPath)) return null
+        val content = Files.readString(logPath)
+
+        val failureRegex = Regex(
+            """## Epoch (\d+) - FAILED.*?\n\n### Failure: (\w+)\n\n```\n(.*?)```\n\n### Attempted Changes\n\n(?:No changes|```diff\n(.*?)```)""",
+            RegexOption.DOT_MATCHES_ALL,
+        )
+
+        val lastMatch = failureRegex.findAll(content).lastOrNull() ?: return null
+        val epoch = lastMatch.groupValues[1].toIntOrNull() ?: return null
+
+        if (epoch != currentEpoch()) return null
+
+        return EpochFailure(
+            epoch = epoch,
+            failureType = lastMatch.groupValues[2],
+            error = lastMatch.groupValues[3].trim(),
+            diff = lastMatch.groupValues[4].trim(),
+        )
     }
 }

@@ -46,7 +46,13 @@ public class StrategyHandler(
                 }
 
                 val position = orderManager.getPosition()
-                val intents = strategy.onOrderBook(orderBook, position)
+                val intents = try {
+                    strategy.onOrderBook(orderBook, position)
+                } catch (e: Exception) {
+                    logger.error(e) { "Strategy error, triggering kill switch" }
+                    killSwitch.manualTrigger("Strategy exception: ${e.message}")
+                    return
+                }
 
                 if (intents.isNotEmpty()) {
                     pendingIntents.set(intents)

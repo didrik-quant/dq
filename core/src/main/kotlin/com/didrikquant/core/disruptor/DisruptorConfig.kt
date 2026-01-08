@@ -3,11 +3,15 @@ package com.didrikquant.core.disruptor
 import com.lmax.disruptor.BusySpinWaitStrategy
 import com.lmax.disruptor.EventFactory
 import com.lmax.disruptor.EventHandler
+import com.lmax.disruptor.ExceptionHandler
 import com.lmax.disruptor.RingBuffer
 import com.lmax.disruptor.dsl.Disruptor
 import com.lmax.disruptor.dsl.ProducerType
+import mu.KotlinLogging
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.atomic.AtomicInteger
+
+private val logger = KotlinLogging.logger {}
 
 public object DisruptorConfig {
     public const val DEFAULT_BUFFER_SIZE: Int = 1024
@@ -15,6 +19,7 @@ public object DisruptorConfig {
     public fun createDisruptor(
         bufferSize: Int = DEFAULT_BUFFER_SIZE,
         handlers: Array<EventHandler<MutableEvent>>,
+        onError: ((Throwable) -> Unit)? = null,
     ): Disruptor<MutableEvent> {
         val factory = EventFactory { MutableEvent() }
         val threadFactory = NamedThreadFactory("disruptor")
@@ -26,6 +31,22 @@ public object DisruptorConfig {
             ProducerType.MULTI,
             BusySpinWaitStrategy(),
         )
+
+        disruptor.setDefaultExceptionHandler(object : ExceptionHandler<MutableEvent> {
+            override fun handleEventException(ex: Throwable, sequence: Long, event: MutableEvent) {
+                logger.error(ex) { "Disruptor exception at sequence $sequence" }
+                onError?.invoke(ex)
+            }
+
+            override fun handleOnStartException(ex: Throwable) {
+                logger.error(ex) { "Disruptor start exception" }
+                onError?.invoke(ex)
+            }
+
+            override fun handleOnShutdownException(ex: Throwable) {
+                logger.error(ex) { "Disruptor shutdown exception" }
+            }
+        })
 
         if (handlers.isNotEmpty()) {
             var group = disruptor.handleEventsWith(handlers[0])
