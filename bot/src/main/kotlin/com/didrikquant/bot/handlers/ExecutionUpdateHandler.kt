@@ -46,6 +46,10 @@ public class ExecutionUpdateHandler(
                 orderManager.onOrderCanceled(e)
                 logger.info { "Order canceled: ${e.orderId} - ${e.reason}" }
             }
+            is Event.OrderAmended -> {
+                orderManager.onOrderAmended(e)
+                logger.info { "Order amended: ${e.oldOrderId} -> ${e.newOrderId} @ ${e.newPrice}" }
+            }
             is Event.OrderRejected -> {
                 throw BotFatalException("Order rejected: ${e.clOrdId} - ${e.reason}")
             }

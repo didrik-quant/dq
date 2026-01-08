@@ -6,8 +6,11 @@ import com.didrikquant.core.Side
 import com.didrikquant.core.StrategyAction
 import com.didrikquant.core.TrackedOrder
 import com.didrikquant.core.roundToTick
+import mu.KotlinLogging
 import java.math.BigDecimal
 import java.math.RoundingMode
+
+private val logger = KotlinLogging.logger {}
 
 public class AgentXrpStrategy(
     private val minSpreadBps: Int = 4,
@@ -79,6 +82,14 @@ public class AgentXrpStrategy(
         actions.addAll(manageOrder(existingBid, Side.BUY, bidPrice, bidSize, mid))
         actions.addAll(manageOrder(existingAsk, Side.SELL, askPrice, askSize, mid))
 
+        if (actions.isNotEmpty() || openOrders.isEmpty()) {
+            logger.info {
+                "mid=$mid spread=${book.spreadBps}bps pos=$position | " +
+                    "bid=$bidPrice x $bidSize, ask=$askPrice x $askSize | " +
+                    "orders=${openOrders.size} actions=${actions.size}"
+            }
+        }
+
         return actions
     }
 
@@ -90,20 +101,24 @@ public class AgentXrpStrategy(
         mid: BigDecimal,
     ): List<StrategyAction> {
         if (existing == null) {
+            logger.debug { "$side: placing $targetPrice x $targetSize" }
             return listOf(StrategyAction.Place(OrderIntent(side, targetPrice, targetSize)))
         }
 
         if (isOrderCrossed(existing, mid)) {
+            logger.info { "$side: CANCEL crossed order ${existing.price} vs mid $mid" }
             return listOf(StrategyAction.Cancel(existing.orderId))
         }
 
         if (existing.isPartiallyFilled()) {
+            logger.debug { "$side: holding partially filled order" }
             return emptyList()
         }
 
         val driftBps = priceDriftBps(existing.price, targetPrice, mid)
 
         if (driftBps > amendThresholdBps) {
+            logger.info { "$side: AMEND ${existing.price} -> $targetPrice (${driftBps}bps drift)" }
             return listOf(StrategyAction.Amend(existing.orderId, targetPrice))
         }
 

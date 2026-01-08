@@ -239,8 +239,17 @@ public class KrakenPrivateWs(
         val result = response["result"]?.jsonPrimitive?.contentOrNull
         if (result == "success") {
             logger.info { "Order canceled: ${cmd.orderId}" }
+            publishEvent(
+                Event.OrderCanceled(
+                    orderId = cmd.orderId,
+                    clOrdId = "",
+                    reason = "user_requested",
+                    timestamp = System.currentTimeMillis(),
+                ),
+            )
         } else {
-            logger.error { "Cancel failed: $response" }
+            val error = response["error"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
+            logger.error { "Cancel failed for ${cmd.orderId}: $error" }
         }
     }
 
@@ -263,8 +272,18 @@ public class KrakenPrivateWs(
         val result = response["result"]?.jsonPrimitive?.contentOrNull
         if (result == "success") {
             val editStatus = response["editStatus"]?.jsonObject
-            val orderId = editStatus?.get("orderId")?.jsonPrimitive?.contentOrNull ?: cmd.orderId
-            logger.info { "Order amended: $orderId to price=${cmd.newPrice}" }
+            val newOrderId = editStatus?.get("orderId")?.jsonPrimitive?.contentOrNull ?: cmd.orderId
+            logger.info { "Order amended: ${cmd.orderId} -> $newOrderId, price=${cmd.newPrice}" }
+            publishEvent(
+                Event.OrderAmended(
+                    oldOrderId = cmd.orderId,
+                    newOrderId = newOrderId,
+                    clOrdId = "",
+                    newPrice = cmd.newPrice,
+                    newQty = cmd.newQty,
+                    timestamp = System.currentTimeMillis(),
+                ),
+            )
         } else {
             val error = response["error"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
             logger.error { "Amend failed for ${cmd.orderId}: $error" }

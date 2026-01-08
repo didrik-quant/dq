@@ -154,5 +154,21 @@ public class OrderManager(private val symbol: String) {
         orders.remove(event.clOrdId)
     }
 
+    public fun onOrderAmended(event: Event.OrderAmended) {
+        val existing = orders.remove(event.oldOrderId) ?: return
+
+        val updated = existing.copy(
+            orderId = event.newOrderId,
+            price = event.newPrice,
+            originalQty = event.newQty ?: existing.originalQty,
+        )
+
+        orders[event.newOrderId] = updated
+
+        if (event.oldOrderId != event.newOrderId) {
+            clOrdIdToOrderId[existing.clOrdId] = event.newOrderId
+        }
+    }
+
     public fun getOrderIdByClOrdId(clOrdId: String): String? = clOrdIdToOrderId[clOrdId]
 }

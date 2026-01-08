@@ -76,6 +76,7 @@ public fun Event.extractTimestamp(): Long = when (this) {
     is Event.OrderAccepted -> timestamp
     is Event.OrderFill -> timestamp
     is Event.OrderCanceled -> timestamp
+    is Event.OrderAmended -> timestamp
     is Event.OrderRejected -> timestamp
     is Event.Connected -> timestamp
     is Event.Disconnected -> timestamp
@@ -103,6 +104,10 @@ private data class EventDto(
     val leavesQty: String? = null,
     val reason: String? = null,
     val connectionType: String? = null,
+    val oldOrderId: String? = null,
+    val newOrderId: String? = null,
+    val newPrice: String? = null,
+    val newQty: String? = null,
 ) {
     fun toEvent(): Event = when (type) {
         "BookSnapshot" -> Event.BookSnapshot(
@@ -144,6 +149,14 @@ private data class EventDto(
             orderId = orderId!!,
             clOrdId = clOrdId!!,
             reason = reason!!,
+            timestamp = timestamp!!,
+        )
+        "OrderAmended" -> Event.OrderAmended(
+            oldOrderId = oldOrderId!!,
+            newOrderId = newOrderId!!,
+            clOrdId = clOrdId ?: "",
+            newPrice = BigDecimal(newPrice!!),
+            newQty = newQty?.let { BigDecimal(it) },
             timestamp = timestamp!!,
         )
         "OrderRejected" -> Event.OrderRejected(
@@ -211,6 +224,15 @@ private data class EventDto(
                 orderId = event.orderId,
                 clOrdId = event.clOrdId,
                 reason = event.reason,
+                timestamp = event.timestamp,
+            )
+            is Event.OrderAmended -> EventDto(
+                type = "OrderAmended",
+                oldOrderId = event.oldOrderId,
+                newOrderId = event.newOrderId,
+                clOrdId = event.clOrdId,
+                newPrice = event.newPrice.toPlainString(),
+                newQty = event.newQty?.toPlainString(),
                 timestamp = event.timestamp,
             )
             is Event.OrderRejected -> EventDto(

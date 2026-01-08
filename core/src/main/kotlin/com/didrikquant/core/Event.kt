@@ -50,6 +50,15 @@ public sealed class Event {
         val timestamp: Long,
     ) : Event()
 
+    public data class OrderAmended(
+        val oldOrderId: String,
+        val newOrderId: String,
+        val clOrdId: String,
+        val newPrice: BigDecimal,
+        val newQty: BigDecimal?,
+        val timestamp: Long,
+    ) : Event()
+
     public data class OrderRejected(
         val clOrdId: String,
         val reason: String,

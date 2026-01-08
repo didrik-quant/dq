@@ -12,6 +12,7 @@ public data class MetricsSnapshot(
     val orderAcceptedCount: Int,
     val orderFillCount: Int,
     val orderCanceledCount: Int,
+    val orderAmendedCount: Int,
     val orderRejectedCount: Int,
     val connectCount: Int,
     val disconnectCount: Int,
@@ -26,6 +27,7 @@ public class ReplayMetrics {
     private val orderAcceptedCount = AtomicInteger(0)
     private val orderFillCount = AtomicInteger(0)
     private val orderCanceledCount = AtomicInteger(0)
+    private val orderAmendedCount = AtomicInteger(0)
     private val orderRejectedCount = AtomicInteger(0)
     private val connectCount = AtomicInteger(0)
     private val disconnectCount = AtomicInteger(0)
@@ -39,6 +41,7 @@ public class ReplayMetrics {
             is Event.OrderAccepted -> orderAcceptedCount.incrementAndGet()
             is Event.OrderFill -> orderFillCount.incrementAndGet()
             is Event.OrderCanceled -> orderCanceledCount.incrementAndGet()
+            is Event.OrderAmended -> orderAmendedCount.incrementAndGet()
             is Event.OrderRejected -> orderRejectedCount.incrementAndGet()
             is Event.Connected -> connectCount.incrementAndGet()
             is Event.Disconnected -> disconnectCount.incrementAndGet()
@@ -57,6 +60,7 @@ public class ReplayMetrics {
         orderAcceptedCount = orderAcceptedCount.get(),
         orderFillCount = orderFillCount.get(),
         orderCanceledCount = orderCanceledCount.get(),
+        orderAmendedCount = orderAmendedCount.get(),
         orderRejectedCount = orderRejectedCount.get(),
         connectCount = connectCount.get(),
         disconnectCount = disconnectCount.get(),
@@ -70,6 +74,7 @@ public class ReplayMetrics {
         orderAcceptedCount.set(0)
         orderFillCount.set(0)
         orderCanceledCount.set(0)
+        orderAmendedCount.set(0)
         orderRejectedCount.set(0)
         connectCount.set(0)
         disconnectCount.set(0)

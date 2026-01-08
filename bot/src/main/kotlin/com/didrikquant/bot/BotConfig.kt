@@ -10,7 +10,7 @@ public data class BotConfig(
     val maxPosition: BigDecimal = BigDecimal("100"),
     val tickSize: BigDecimal = BigDecimal("0.0001"),
     val riskConfig: RiskConfig = RiskConfig(),
-    val requoteIntervalMs: Long = 2000,
+    val requoteIntervalMs: Long = 0,
     val dryRun: Boolean = false,
     val epochTradeCount: Int? = null,
     val epochMaxDurationMs: Long? = null,

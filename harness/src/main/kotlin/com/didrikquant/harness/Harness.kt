@@ -130,6 +130,28 @@ public class Harness(private val config: HarnessConfig) {
             - Strategy code: strategy/src/main/kotlin/com/didrikquant/strategy/${config.strategyClass}.kt
             - Evolution log: agents/${config.instrument}/evolution.md
 
+            LOGGING REQUIREMENTS (MANDATORY):
+            Your strategy MUST include logging for observability. Use mu.KotlinLogging:
+            ```kotlin
+            import mu.KotlinLogging
+            private val logger = KotlinLogging.logger {}
+            ```
+            
+            Required log points:
+            - INFO: Every quote decision (prices, sizes, position)
+            - INFO: Every amend/cancel with reason
+            - DEBUG: Order management decisions
+            - WARN: Unusual conditions (wide spreads, risk limits)
+            
+            Example:
+            ```kotlin
+            logger.info { "mid=${'$'}mid pos=${'$'}position | bid=${'$'}bidPrice ask=${'$'}askPrice" }
+            logger.info { "BUY: AMEND ${'$'}{old} -> ${'$'}{new} (${'$'}{drift}bps drift)" }
+            logger.warn { "Spread ${'$'}{spread}bps exceeds threshold" }
+            ```
+            
+            Strategies without logging are incomplete.
+
             Read the evolution log to understand the history of changes and their results.
             $crashContext
             TOOLS:
@@ -139,8 +161,9 @@ public class Harness(private val config: HarnessConfig) {
             WORKFLOW:
             1. Read the evolution log to understand past changes and results
             2. Make ONE focused improvement to the strategy
-            3. Run `bazel build //...` to verify your changes compile
-            4. Fix any build errors before finishing
+            3. Ensure your strategy has adequate logging (see LOGGING REQUIREMENTS above)
+            4. Run `bazel build //...` to verify your changes compile
+            5. Fix any build errors before finishing
 
             This is epoch $epoch. Good luck.
             """.trimIndent()
@@ -179,8 +202,6 @@ public class Harness(private val config: HarnessConfig) {
     private fun runBot(worktreePath: Path): BotResult {
         logger.info { "Running bot for ${config.epochTradeCount} trades (max ${config.epochMaxDurationMs}ms)" }
 
-        val logFile = Files.createTempFile("bot-output", ".log")
-
         val args = listOf(
             "bazel",
             "run",
@@ -193,12 +214,24 @@ public class Harness(private val config: HarnessConfig) {
         val processBuilder = ProcessBuilder(args)
             .directory(worktreePath.toFile())
             .redirectErrorStream(true)
-            .redirectOutput(logFile.toFile())
 
         config.krakenApiKey?.let { processBuilder.environment()["KRAKEN_API_KEY"] = it }
         config.krakenApiSecret?.let { processBuilder.environment()["KRAKEN_API_SECRET"] = it }
 
         val process = processBuilder.start()
+        val outputCapture = StringBuilder()
+
+        val outputThread = Thread {
+            process.inputStream.bufferedReader().forEachLine { line ->
+                logger.info { "[BOT] $line" }
+                outputCapture.appendLine(line)
+            }
+        }.apply {
+            isDaemon = true
+            name = "bot-output-reader"
+            start()
+        }
+
         val timeoutMs = config.epochMaxDurationMs + config.gracePeriodMs
         val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
 
@@ -208,14 +241,13 @@ public class Harness(private val config: HarnessConfig) {
             process.waitFor(10, TimeUnit.SECONDS)
         }
 
+        outputThread.join(2000)
+
         val exitCode = process.exitValue()
         logger.info { "Bot exited with code: $exitCode" }
 
-        val output = Files.readString(logFile)
-        Files.deleteIfExists(logFile)
-
         return if (exitCode != 0) {
-            val error = extractCrashError(output)
+            val error = extractCrashError(outputCapture.toString())
             BotResult(crashed = true, exitCode = exitCode, error = error)
         } else {
             BotResult(crashed = false, exitCode = exitCode)
