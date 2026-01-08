@@ -2,6 +2,7 @@ package com.didrikquant.execution
 
 import com.didrikquant.core.*
 import java.math.BigDecimal
+import java.math.RoundingMode
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicReference
@@ -11,8 +12,12 @@ public class OrderManager(private val symbol: String) {
     private val orders = ConcurrentHashMap<String, TrackedOrder>()
     private val clOrdIdToOrderId = ConcurrentHashMap<String, String>()
     private val position = AtomicReference(BigDecimal.ZERO)
+    private val realizedPnl = AtomicReference(BigDecimal.ZERO)
+    private val avgEntryPrice = AtomicReference<BigDecimal?>(null)
 
     public fun getPosition(): BigDecimal = position.get()
+
+    public fun getRealizedPnl(): BigDecimal = realizedPnl.get()
 
     public fun getOpenOrderCount(): Int =
         orders.values.count { it.status == OrderStatus.OPEN || it.status == OrderStatus.PARTIALLY_FILLED }
@@ -69,14 +74,68 @@ public class OrderManager(private val symbol: String) {
 
         orders[event.orderId] = order.copy(filledQty = newFilledQty, status = newStatus)
 
-        val positionDelta = when (event.side) {
-            Side.BUY -> event.fillQty
-            Side.SELL -> event.fillQty.negate()
+        val currentPosition = position.get()
+        val fillPrice = event.fillPrice
+        val fillQty = event.fillQty
+
+        val avgEntry = avgEntryPrice.get()
+        if (avgEntry != null) {
+            val isReducing = when (event.side) {
+                Side.BUY -> currentPosition < BigDecimal.ZERO
+                Side.SELL -> currentPosition > BigDecimal.ZERO
+            }
+            if (isReducing) {
+                val pnlPerUnit = when (event.side) {
+                    Side.BUY -> avgEntry - fillPrice
+                    Side.SELL -> fillPrice - avgEntry
+                }
+                val thisPnl = pnlPerUnit * fillQty
+                realizedPnl.updateAndGet { it + thisPnl }
+            }
         }
-        position.updateAndGet { it + positionDelta }
+
+        val positionDelta = when (event.side) {
+            Side.BUY -> fillQty
+            Side.SELL -> fillQty.negate()
+        }
+        val newPosition = position.updateAndGet { it + positionDelta }
+
+        updateAvgEntryPrice(currentPosition, newPosition, fillPrice, fillQty, event.side)
 
         if (newStatus == OrderStatus.FILLED) {
             orders.remove(event.orderId)
+        }
+    }
+
+    private fun updateAvgEntryPrice(
+        oldPosition: BigDecimal,
+        newPosition: BigDecimal,
+        fillPrice: BigDecimal,
+        fillQty: BigDecimal,
+        side: Side,
+    ) {
+        if (newPosition.signum() == 0) {
+            avgEntryPrice.set(null)
+            return
+        }
+
+        val currentAvg = avgEntryPrice.get()
+        if (currentAvg == null) {
+            avgEntryPrice.set(fillPrice)
+            return
+        }
+
+        val wasFlat = oldPosition.signum() == 0
+        val sameDirection = oldPosition.signum() == newPosition.signum()
+
+        when {
+            wasFlat -> avgEntryPrice.set(fillPrice)
+            sameDirection -> {
+                val totalValue = (currentAvg * oldPosition.abs()) + (fillPrice * fillQty)
+                val newAvg = totalValue.divide(newPosition.abs(), 8, RoundingMode.HALF_UP)
+                avgEntryPrice.set(newAvg)
+            }
+            else -> avgEntryPrice.set(fillPrice)
         }
     }
 

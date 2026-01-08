@@ -65,7 +65,7 @@ public class Pipeline(
                 strategyHandler = strategyHandler,
                 symbol = config.symbol,
             )
-        executionHandler = ExecutionHandler(orderManager)
+        executionHandler = ExecutionHandler(orderManager, killSwitch)
         outputHandler =
             if (config.dryRun) {
                 DryRunOutputHandler(orderBook)

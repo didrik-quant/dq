@@ -3,6 +3,7 @@ package com.didrikquant.bot.handlers
 import com.didrikquant.core.Event
 import com.didrikquant.core.disruptor.MutableEvent
 import com.didrikquant.execution.OrderManager
+import com.didrikquant.risk.KillSwitch
 import com.lmax.disruptor.EventHandler
 import mu.KotlinLogging
 import java.util.concurrent.atomic.AtomicInteger
@@ -11,6 +12,7 @@ private val logger = KotlinLogging.logger {}
 
 public class ExecutionHandler(
     private val orderManager: OrderManager,
+    private val killSwitch: KillSwitch,
 ) : EventHandler<MutableEvent> {
     private val _fillCount = AtomicInteger(0)
     public val fillCount: Int get() = _fillCount.get()
@@ -28,8 +30,11 @@ public class ExecutionHandler(
             is Event.OrderFill -> {
                 orderManager.onOrderFill(e)
                 val count = _fillCount.incrementAndGet()
+                val pnl = orderManager.getRealizedPnl()
+                killSwitch.updatePnl(pnl)
                 logger.info {
-                    "Fill #$count: ${e.fillQty} @ ${e.fillPrice}, position=${orderManager.getPosition()}"
+                    "Fill #$count: ${e.fillQty} @ ${e.fillPrice}, " +
+                        "position=${orderManager.getPosition()}, pnl=$pnl"
                 }
             }
             is Event.OrderCanceled -> {

@@ -21,6 +21,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import mu.KotlinLogging
 import java.math.BigDecimal
+import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
 
@@ -197,32 +198,38 @@ public fun main(args: Array<String>): Unit =
             }
         logger.info { runMessage }
 
-        while (scope.isActive) {
+        var exitReason = ExitReason.SUCCESS
+
+        mainLoop@ while (scope.isActive) {
             delay(1000)
 
             if (!publicWs.isReady()) {
                 logger.error { "Public WS disconnected, ending epoch early" }
+                exitReason = ExitReason.PUBLIC_WS_DISCONNECT
                 if (!dryRun && privateWs != null && privateWs.isReady()) {
                     privateWs.sendCommand(Command.CancelAll(botConfig.symbol))
                     delay(500)
                 }
-                break
+                break@mainLoop
             }
 
             if (!dryRun && privateWs != null && !privateWs.isReady()) {
                 logger.error { "Private WS disconnected, ending epoch early" }
-                break
+                exitReason = ExitReason.PRIVATE_WS_DISCONNECT
+                break@mainLoop
             }
 
             if (pipeline.killSwitch.isTriggered()) {
                 logger.error { "KILL SWITCH TRIGGERED: ${pipeline.killSwitch.getTriggerReason()}" }
+                exitReason = ExitReason.KILL_SWITCH
                 if (!dryRun && privateWs != null) {
                     privateWs.sendCommand(Command.CancelAll(botConfig.symbol))
                 }
-                break
+                break@mainLoop
             }
 
-            botConfig.epochTradeCount?.let { targetTrades ->
+            val targetTrades = botConfig.epochTradeCount
+            if (targetTrades != null) {
                 val fillCount = pipeline.getFillCount()
                 if (fillCount >= targetTrades) {
                     logger.info { "Epoch trade target reached ($fillCount trades). Shutting down." }
@@ -230,11 +237,12 @@ public fun main(args: Array<String>): Unit =
                         privateWs.sendCommand(Command.CancelAll(botConfig.symbol))
                         delay(1000)
                     }
-                    break
+                    break@mainLoop
                 }
             }
 
-            botConfig.epochMaxDurationMs?.let { maxMs ->
+            val maxMs = botConfig.epochMaxDurationMs
+            if (maxMs != null) {
                 val elapsed = System.currentTimeMillis() - startTimeMs
                 if (elapsed >= maxMs) {
                     logger.info { "Epoch max duration reached (${elapsed}ms). Shutting down." }
@@ -242,7 +250,7 @@ public fun main(args: Array<String>): Unit =
                         privateWs.sendCommand(Command.CancelAll(botConfig.symbol))
                         delay(1000)
                     }
-                    break
+                    break@mainLoop
                 }
             }
         }
@@ -252,6 +260,11 @@ public fun main(args: Array<String>): Unit =
         pipeline.stop()
         restClient?.close()
         scope.cancel()
+
+        if (exitReason != ExitReason.SUCCESS) {
+            logger.warn { "Exiting with code ${exitReason.code} (${exitReason.name})" }
+            exitProcess(exitReason.code)
+        }
     }
 
 private data class ParsedArgs(
