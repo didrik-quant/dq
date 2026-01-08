@@ -50,7 +50,7 @@ public class Pipeline(
     ): Disruptor<MutableEvent> {
         commandSender = CommandSender(restClient, config.symbol)
 
-        val executionStateHandler = ExecutionStateHandler(orderManager)
+        val executionStateHandler = ExecutionStateHandler(orderManager, config.riskConfig.maxLossUsd)
         val bookHandler = BookHandler(orderBook)
         val strategyHandler = StrategyHandler(strategy, config.requoteIntervalMs)
         val riskHandler = RiskHandler(riskChecker, config.symbol)
@@ -59,7 +59,7 @@ public class Pipeline(
         } else {
             OutputHandler(commandSender!!)
         }
-        val executionUpdateHandler = ExecutionUpdateHandler(orderManager, config.riskConfig.maxLossUsd)
+        val executionUpdateHandler = ExecutionUpdateHandler(orderManager)
         val epochGuardHandler = EpochGuardHandler(config.epochTradeCount, config.epochMaxDurationMs)
         val monitoringHandler = MonitoringHandler(logEveryNEvents = 1000)
 

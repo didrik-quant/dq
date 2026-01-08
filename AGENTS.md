@@ -34,6 +34,17 @@ bazel clean --expunge
 - Max line length: 120 characters
 - Use explicit API mode for public APIs
 
+## No Backward Compatibility
+
+This project does NOT maintain backward compatibility. When refactoring:
+
+- Delete obsolete code, fields, and methods immediately
+- Do not keep deprecated APIs "for compatibility"
+- Do not add compatibility shims or adapters
+- Update all consumers in the same commit
+
+Clean, simple code is prioritized over migration paths.
+
 ## Linting (ktlint)
 
 ktlint is integrated via Bazel using `rules_kotlin`. Configuration is in `.editorconfig`.
@@ -159,12 +170,12 @@ ExecutionStateHandler → BookHandler → StrategyHandler → RiskHandler → Ou
 
 | Handler | Reads From Event | Writes To Event |
 |---------|------------------|-----------------|
-| ExecutionStateHandler | - | `executionSnapshot` |
+| ExecutionStateHandler | order events | `executionSnapshot` |
 | BookHandler | - | `orderBookSnapshot` |
 | StrategyHandler | `orderBookSnapshot`, `executionSnapshot` | `actions` |
 | RiskHandler | `executionSnapshot`, `actions` | `commands`, `newPendingOrders` |
 | OutputHandler | `commands` | (sends to CommandSender) |
-| ExecutionUpdateHandler | `newPendingOrders`, order events | (updates OrderManager) |
+| ExecutionUpdateHandler | `newPendingOrders` | (registers pending orders) |
 | EpochGuardHandler | fill events | (throws on epoch complete) |
 | MonitoringHandler | `orderBookSnapshot`, `executionSnapshot` | (logs status) |
 | CleanupHandler | - | (clears all fields) |
@@ -213,9 +224,9 @@ The bot runs inside a harness that manages trading epochs. When something goes w
 
 ### Fatal Conditions
 
-- Max loss exceeded (PnL check in ExecutionUpdateHandler)
+- Max loss exceeded (PnL check in ExecutionStateHandler)
 - Strategy exception (wrapped in BotFatalException)
-- Order rejected by exchange
+- Order rejected by exchange (checked in ExecutionStateHandler)
 - Epoch trade target reached (EpochGuardHandler)
 - Epoch max duration reached (EpochGuardHandler)
 - Any unexpected error

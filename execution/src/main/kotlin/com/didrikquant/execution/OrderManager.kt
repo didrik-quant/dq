@@ -19,20 +19,15 @@ public class OrderManager(private val symbol: String) {
 
     public fun getRealizedPnl(): BigDecimal = realizedPnl.get()
 
-    public fun getOpenOrderCount(): Int =
-        orders.values.count { it.status == OrderStatus.OPEN || it.status == OrderStatus.PARTIALLY_FILLED }
-
-    public fun getOpenOrders(): List<TrackedOrder> =
-        orders.values.filter { it.status == OrderStatus.OPEN || it.status == OrderStatus.PARTIALLY_FILLED }
-
-    public fun getPendingOrderCount(): Int =
-        orders.values.count { it.status == OrderStatus.PENDING }
+    public fun getActiveOrders(): List<TrackedOrder> =
+        orders.values.filter {
+            it.status in setOf(OrderStatus.PENDING, OrderStatus.OPEN, OrderStatus.PARTIALLY_FILLED)
+        }
 
     public fun snapshot(): ExecutionSnapshot = ExecutionSnapshot(
         position = position.get(),
         realizedPnl = realizedPnl.get(),
-        openOrders = getOpenOrders(),
-        pendingOrderCount = getPendingOrderCount(),
+        openOrders = getActiveOrders(),
     )
 
     public fun getOpenOrderBySide(side: Side): TrackedOrder? =
