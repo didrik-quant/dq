@@ -84,6 +84,13 @@ public class OrderBook(public val symbol: String) {
 
     public fun isValid(): Boolean = bids.isNotEmpty() && asks.isNotEmpty()
 
+    public fun snapshot(depth: Int = 10): OrderBookSnapshot = OrderBookSnapshot(
+        symbol = symbol,
+        sequence = sequence,
+        bids = topBids(depth),
+        asks = topAsks(depth),
+    )
+
     override fun toString(): String =
         "OrderBook($symbol, bid=$bestBid, ask=$bestAsk, mid=$midPrice, spread=${spreadBps}bps)"
 }

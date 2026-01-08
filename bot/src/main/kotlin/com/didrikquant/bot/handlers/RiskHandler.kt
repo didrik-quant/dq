@@ -1,19 +1,20 @@
 package com.didrikquant.bot.handlers
 
+import com.didrikquant.core.BotFatalException
 import com.didrikquant.core.Command
+import com.didrikquant.core.PendingOrderIntent
 import com.didrikquant.core.StrategyAction
 import com.didrikquant.core.disruptor.MutableEvent
-import com.didrikquant.execution.OrderManager
 import com.didrikquant.risk.RiskCheckResult
 import com.didrikquant.risk.RiskChecker
 import com.lmax.disruptor.EventHandler
 import mu.KotlinLogging
+import java.util.UUID
 
 private val logger = KotlinLogging.logger {}
 
 public class RiskHandler(
     private val riskChecker: RiskChecker,
-    private val orderManager: OrderManager,
     private val symbol: String,
 ) : EventHandler<MutableEvent> {
     override fun onEvent(
@@ -24,18 +25,27 @@ public class RiskHandler(
         val actions = event.actions
         if (actions.isEmpty()) return
 
+        val execSnapshot = event.executionSnapshot
+            ?: throw BotFatalException("No execution snapshot available in RiskHandler")
+
         val commands = mutableListOf<Command>()
-        val position = orderManager.getPosition()
-        val openOrderCount = orderManager.getOpenOrderCount()
+        val pendingOrders = mutableListOf<PendingOrderIntent>()
 
         for (action in actions) {
             when (action) {
                 is StrategyAction.Place -> {
                     val intent = action.intent
-                    when (val result = riskChecker.check(intent, position, openOrderCount)) {
+                    when (val result = riskChecker.check(intent, execSnapshot.position, execSnapshot.openOrderCount)) {
                         is RiskCheckResult.Approved -> {
-                            val clOrdId = orderManager.generateClOrdId()
-                            orderManager.registerPendingOrder(clOrdId, intent.side, intent.price, intent.qty)
+                            val clOrdId = generateClOrdId()
+                            pendingOrders.add(
+                                PendingOrderIntent(
+                                    clOrdId = clOrdId,
+                                    side = intent.side,
+                                    price = intent.price,
+                                    qty = intent.qty,
+                                ),
+                            )
                             commands.add(
                                 Command.PlaceOrder(
                                     clOrdId = clOrdId,
@@ -72,6 +82,10 @@ public class RiskHandler(
 
         if (commands.isNotEmpty()) {
             event.commands = commands
+            event.newPendingOrders = pendingOrders
         }
     }
+
+    private fun generateClOrdId(): String =
+        UUID.randomUUID().toString().replace("-", "").take(18)
 }

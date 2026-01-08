@@ -25,6 +25,16 @@ public class OrderManager(private val symbol: String) {
     public fun getOpenOrders(): List<TrackedOrder> =
         orders.values.filter { it.status == OrderStatus.OPEN || it.status == OrderStatus.PARTIALLY_FILLED }
 
+    public fun getPendingOrderCount(): Int =
+        orders.values.count { it.status == OrderStatus.PENDING }
+
+    public fun snapshot(): ExecutionSnapshot = ExecutionSnapshot(
+        position = position.get(),
+        realizedPnl = realizedPnl.get(),
+        openOrders = getOpenOrders(),
+        pendingOrderCount = getPendingOrderCount(),
+    )
+
     public fun getOpenOrderBySide(side: Side): TrackedOrder? =
         orders.values.find {
             it.side == side && (it.status == OrderStatus.OPEN || it.status == OrderStatus.PARTIALLY_FILLED)

@@ -1,6 +1,6 @@
 package com.didrikquant.strategy
 
-import com.didrikquant.core.OrderBook
+import com.didrikquant.core.OrderBookSnapshot
 import com.didrikquant.core.OrderIntent
 import com.didrikquant.core.Side
 import com.didrikquant.core.StrategyAction
@@ -19,8 +19,8 @@ public class AgentXrpStrategy(
     private val depthCheckQty: BigDecimal = BigDecimal("100"),
     private val maxSpreadWidenBps: Int = 4,
 ) : Strategy {
-    override fun onOrderBook(
-        book: OrderBook,
+    override fun onBookSnapshot(
+        book: OrderBookSnapshot,
         position: BigDecimal,
         openOrders: List<TrackedOrder>,
     ): List<StrategyAction> {
@@ -117,7 +117,7 @@ public class AgentXrpStrategy(
     }
 
     private fun calculateDepthAdjustment(
-        book: OrderBook,
+        book: OrderBookSnapshot,
         mid: BigDecimal,
     ): Int {
         val topBids = book.topBids(5)

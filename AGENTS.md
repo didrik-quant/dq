@@ -83,10 +83,10 @@ dq/
 ├── BUILD.bazel       # Root build + Kotlin toolchain
 ├── .bazelrc          # Bazel configuration
 ├── bot/              # Main MM bot application
-├── core/             # Core domain types (Event, Command, OrderBook)
+├── core/             # Core domain types (Event, Command, OrderBook, Snapshots)
 ├── strategy/         # Trading strategies (AgentXrpStrategy, SimpleMarketMaker)
 ├── execution/        # Order management
-├── risk/             # Risk checking and kill switch
+├── risk/             # Risk checking
 ├── kraken-client/    # Kraken Futures API client
 ├── replay/           # Traffic recording for analysis
 ├── cli/              # CLI tools (dq fills, dq book)
@@ -103,43 +103,50 @@ The bot uses LMAX Disruptor for high-performance event processing. Events flow t
 ### Handler Chain
 
 ```
-BookHandler → StrategyHandler → RiskHandler → ExecutionHandler → OutputHandler → EventRecorder → CleanupHandler
+ExecutionStateHandler → BookHandler → StrategyHandler → RiskHandler → OutputHandler → ExecutionUpdateHandler → EpochGuardHandler → MonitoringHandler → EventRecorder → CleanupHandler
 ```
 
-### Critical Principles
+### Handler Independence (CRITICAL)
 
-**1. Handlers MUST be independent**
-- Handlers MUST NOT reference each other
-- No constructor injection of other handlers
-- No direct method calls between handlers
+**Handlers MUST NOT share mutable state.** All data flows through `MutableEvent` via immutable snapshots.
 
-**2. All inter-handler communication flows through MutableEvent**
-```kotlin
-// StrategyHandler writes:
-event.actions = actions
+#### Snapshots (immutable, created by state owners)
+- `OrderBookSnapshot` - created by BookHandler after updating OrderBook
+- `ExecutionSnapshot` - created by ExecutionStateHandler from OrderManager
 
-// RiskHandler reads:
-val actions = event.actions
+#### Data Flow Through MutableEvent
 
-// RiskHandler writes:
-event.commands = commands
-
-// OutputHandler reads:
-val commands = event.commands
-```
-
-**3. CleanupHandler must be last**
-- Clears all event fields after processing
-- Prevents memory leaks from ring buffer reuse
-- Always placed after EventRecorder
+| Handler | Reads From Event | Writes To Event |
+|---------|------------------|-----------------|
+| ExecutionStateHandler | - | `executionSnapshot` |
+| BookHandler | - | `orderBookSnapshot` |
+| StrategyHandler | `orderBookSnapshot`, `executionSnapshot` | `actions` |
+| RiskHandler | `executionSnapshot`, `actions` | `commands`, `newPendingOrders` |
+| OutputHandler | `commands` | (sends to CommandSender) |
+| ExecutionUpdateHandler | `newPendingOrders`, order events | (updates OrderManager) |
+| EpochGuardHandler | fill events | (throws on epoch complete) |
+| MonitoringHandler | `orderBookSnapshot`, `executionSnapshot` | (logs status) |
+| CleanupHandler | - | (clears all fields) |
 
 ### MutableEvent Structure
 
 ```kotlin
 public class MutableEvent {
-    var event: Event? = null        // Input: market data, order events
-    var actions: List<StrategyAction> = emptyList()  // Strategy → Risk
-    var commands: List<Command> = emptyList()        // Risk → Output
+    // Input event
+    var event: Event? = null
+    
+    // Snapshots (immutable, set by state-owning handlers)
+    var orderBookSnapshot: OrderBookSnapshot? = null
+    var executionSnapshot: ExecutionSnapshot? = null
+    
+    // Strategy -> Risk
+    var actions: List<StrategyAction> = emptyList()
+    
+    // Risk -> Output
+    var commands: List<Command> = emptyList()
+    
+    // Risk -> ExecutionUpdate
+    var newPendingOrders: List<PendingOrderIntent> = emptyList()
     
     fun clear() { /* resets all fields */ }
 }
@@ -148,10 +155,47 @@ public class MutableEvent {
 ### Adding New Handlers
 
 1. Create class implementing `EventHandler<MutableEvent>`
-2. Read from event fields set by upstream handlers
+2. Read from snapshot fields set by upstream handlers
 3. Write to event fields for downstream handlers
 4. Add to handler list in `Pipeline.kt` (before CleanupHandler)
-5. NEVER inject or reference other handlers
+5. **NEVER inject or reference other handlers**
+6. **NEVER share mutable state between handlers**
+
+## Fail-Fast Principle
+
+The bot runs inside a harness that manages trading epochs. When something goes wrong:
+
+1. **Throw `BotFatalException`** - don't try to recover
+2. **Exception handler cancels all orders** - via `CommandSender.cancelAllAndShutdown()`
+3. **Process exits** - `System.exit(1)`
+4. **Harness logs results** - epoch ends
+
+### Fatal Conditions
+
+- Max loss exceeded (PnL check in ExecutionUpdateHandler)
+- Strategy exception (wrapped in BotFatalException)
+- Order rejected by exchange
+- Epoch trade target reached (EpochGuardHandler)
+- Epoch max duration reached (EpochGuardHandler)
+- Any unexpected error
+
+**NO error recovery. NO graceful degradation. Throw and die.**
+
+## No Coroutines or Spinlocks
+
+The bot MUST NOT use:
+- Coroutine polling loops (`while (condition) { delay(...) }`)
+- Spinlock patterns
+- Busy-waiting of any kind
+
+All control flow happens through the Disruptor pipeline:
+- Market data → handlers process → actions generated
+- Epoch limits → EpochGuardHandler throws → process exits
+- Errors → exception handler → process exits
+
+If you need periodic behavior, use a handler that checks conditions on each event.
+
+**Exception**: The command-sending coroutine is acceptable because WebSocket `sendCommand()` is a suspend function that cannot be called from the Disruptor thread. This is a bridge between the non-coroutine Disruptor world and the coroutine WebSocket world.
 
 ## Epoch-Based Strategy Evolution
 

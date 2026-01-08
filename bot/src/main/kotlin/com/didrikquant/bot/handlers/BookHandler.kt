@@ -19,11 +19,13 @@ public class BookHandler(
         when (val e = event.event) {
             is Event.BookSnapshot -> {
                 orderBook.applySnapshot(e.bids, e.asks, sequence)
-                logger.debug { "Book snapshot: $orderBook" }
+                event.orderBookSnapshot = orderBook.snapshot()
+                logger.debug { "Book snapshot: ${event.orderBookSnapshot}" }
             }
             is Event.BookUpdate -> {
                 orderBook.applyUpdate(e.bids, e.asks, sequence)
-                logger.trace { "Book update: $orderBook" }
+                event.orderBookSnapshot = orderBook.snapshot()
+                logger.trace { "Book update: ${event.orderBookSnapshot}" }
             }
             else -> {}
         }

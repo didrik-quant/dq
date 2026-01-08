@@ -1,6 +1,6 @@
 package com.didrikquant.strategy
 
-import com.didrikquant.core.OrderBook
+import com.didrikquant.core.OrderBookSnapshot
 import com.didrikquant.core.OrderIntent
 import com.didrikquant.core.Side
 import com.didrikquant.core.StrategyAction
@@ -15,8 +15,8 @@ public class SimpleMarketMaker(
     private val skewFactor: BigDecimal = BigDecimal("0.0001"),
     private val tickSize: BigDecimal = BigDecimal("0.00001"),
 ) : Strategy {
-    override fun onOrderBook(
-        book: OrderBook,
+    override fun onBookSnapshot(
+        book: OrderBookSnapshot,
         position: BigDecimal,
         openOrders: List<TrackedOrder>,
     ): List<StrategyAction> {

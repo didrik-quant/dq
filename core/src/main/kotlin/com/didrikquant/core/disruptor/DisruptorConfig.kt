@@ -10,16 +10,23 @@ import com.lmax.disruptor.dsl.ProducerType
 import mu.KotlinLogging
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
 
 public object DisruptorConfig {
     public const val DEFAULT_BUFFER_SIZE: Int = 1024
 
+    /**
+     * Creates a Disruptor with the given handlers chained sequentially.
+     *
+     * @param handlers Array of handlers to chain in order
+     * @param onFatalError Called on any exception, should cancel orders and prepare for exit
+     */
     public fun createDisruptor(
         bufferSize: Int = DEFAULT_BUFFER_SIZE,
         handlers: Array<EventHandler<MutableEvent>>,
-        onError: ((Throwable) -> Unit)? = null,
+        onFatalError: ((Throwable) -> Unit)? = null,
     ): Disruptor<MutableEvent> {
         val factory = EventFactory { MutableEvent() }
         val threadFactory = NamedThreadFactory("disruptor")
@@ -34,13 +41,15 @@ public object DisruptorConfig {
 
         disruptor.setDefaultExceptionHandler(object : ExceptionHandler<MutableEvent> {
             override fun handleEventException(ex: Throwable, sequence: Long, event: MutableEvent) {
-                logger.error(ex) { "Disruptor exception at sequence $sequence" }
-                onError?.invoke(ex)
+                logger.error(ex) { "Fatal error at sequence $sequence - shutting down" }
+                onFatalError?.invoke(ex)
+                exitProcess(1)
             }
 
             override fun handleOnStartException(ex: Throwable) {
-                logger.error(ex) { "Disruptor start exception" }
-                onError?.invoke(ex)
+                logger.error(ex) { "Disruptor start exception - shutting down" }
+                onFatalError?.invoke(ex)
+                exitProcess(1)
             }
 
             override fun handleOnShutdownException(ex: Throwable) {

@@ -4,7 +4,10 @@ import com.didrikquant.bot.handlers.BookHandler
 import com.didrikquant.bot.handlers.CleanupHandler
 import com.didrikquant.bot.handlers.CommandOutputHandler
 import com.didrikquant.bot.handlers.DryRunOutputHandler
-import com.didrikquant.bot.handlers.ExecutionHandler
+import com.didrikquant.bot.handlers.EpochGuardHandler
+import com.didrikquant.bot.handlers.ExecutionStateHandler
+import com.didrikquant.bot.handlers.ExecutionUpdateHandler
+import com.didrikquant.bot.handlers.MonitoringHandler
 import com.didrikquant.bot.handlers.OutputHandler
 import com.didrikquant.bot.handlers.RiskHandler
 import com.didrikquant.bot.handlers.StrategyHandler
@@ -12,9 +15,9 @@ import com.didrikquant.core.OrderBook
 import com.didrikquant.core.disruptor.DisruptorConfig
 import com.didrikquant.core.disruptor.MutableEvent
 import com.didrikquant.execution.OrderManager
+import com.didrikquant.kraken.KrakenRestClient
 import com.didrikquant.replay.recorder.EventRecorder
 import com.didrikquant.replay.recorder.RecorderConfig
-import com.didrikquant.risk.KillSwitch
 import com.didrikquant.risk.RiskChecker
 import com.didrikquant.strategy.AgentXrpStrategy
 import com.didrikquant.strategy.SimpleMarketMaker
@@ -27,60 +30,49 @@ private val logger = KotlinLogging.logger {}
 public class Pipeline(
     private val config: BotConfig,
 ) {
-    public val orderBook: OrderBook = OrderBook(config.symbol)
-    public val orderManager: OrderManager = OrderManager(config.symbol)
-    public val killSwitch: KillSwitch = KillSwitch(config.riskConfig)
-
+    private val orderBook = OrderBook(config.symbol)
+    private val orderManager = OrderManager(config.symbol)
     private val strategy: Strategy = createStrategy(config)
     private val riskChecker = RiskChecker(config.riskConfig)
 
-    public lateinit var bookHandler: BookHandler
-        private set
-    public lateinit var strategyHandler: StrategyHandler
-        private set
-    public lateinit var riskHandler: RiskHandler
-        private set
-    public lateinit var executionHandler: ExecutionHandler
-        private set
-    public lateinit var outputHandler: CommandOutputHandler
-        private set
-    public var eventRecorder: EventRecorder? = null
-        private set
-
     private lateinit var disruptor: Disruptor<MutableEvent>
+    private var eventRecorder: EventRecorder? = null
+    private var commandSender: CommandSender? = null
 
-    public fun start(recorderConfig: RecorderConfig? = null): Disruptor<MutableEvent> {
-        bookHandler = BookHandler(orderBook)
-        strategyHandler =
-            StrategyHandler(
-                strategy = strategy,
-                orderBook = orderBook,
-                orderManager = orderManager,
-                killSwitch = killSwitch,
-                requoteIntervalMs = config.requoteIntervalMs,
-            )
-        riskHandler =
-            RiskHandler(
-                riskChecker = riskChecker,
-                orderManager = orderManager,
-                symbol = config.symbol,
-            )
-        executionHandler = ExecutionHandler(orderManager, killSwitch)
-        outputHandler =
-            if (config.dryRun) {
-                DryRunOutputHandler(orderBook)
-            } else {
-                OutputHandler()
-            }
+    /**
+     * Start the pipeline with the new handler chain:
+     * ExecutionStateHandler -> BookHandler -> StrategyHandler -> RiskHandler ->
+     * OutputHandler -> ExecutionUpdateHandler -> EpochGuardHandler -> MonitoringHandler -> CleanupHandler
+     */
+    public fun start(
+        recorderConfig: RecorderConfig? = null,
+        restClient: KrakenRestClient? = null,
+    ): Disruptor<MutableEvent> {
+        commandSender = CommandSender(restClient, config.symbol)
 
-        val handlers =
-            mutableListOf(
-                bookHandler,
-                strategyHandler,
-                riskHandler,
-                executionHandler,
-                outputHandler,
-            )
+        val executionStateHandler = ExecutionStateHandler(orderManager)
+        val bookHandler = BookHandler(orderBook)
+        val strategyHandler = StrategyHandler(strategy, config.requoteIntervalMs)
+        val riskHandler = RiskHandler(riskChecker, config.symbol)
+        val outputHandler: CommandOutputHandler = if (config.dryRun) {
+            DryRunOutputHandler()
+        } else {
+            OutputHandler(commandSender!!)
+        }
+        val executionUpdateHandler = ExecutionUpdateHandler(orderManager, config.riskConfig.maxLossUsd)
+        val epochGuardHandler = EpochGuardHandler(config.epochTradeCount, config.epochMaxDurationMs)
+        val monitoringHandler = MonitoringHandler(logEveryNEvents = 1000)
+
+        val handlers = mutableListOf(
+            executionStateHandler,
+            bookHandler,
+            strategyHandler,
+            riskHandler,
+            outputHandler,
+            executionUpdateHandler,
+            epochGuardHandler,
+            monitoringHandler,
+        )
 
         if (recorderConfig != null) {
             eventRecorder = EventRecorder(recorderConfig)
@@ -90,13 +82,13 @@ public class Pipeline(
         // CleanupHandler MUST be last - clears event after all processing
         handlers.add(CleanupHandler())
 
-        disruptor =
-            DisruptorConfig.createDisruptor(
-                handlers = handlers.toTypedArray(),
-                onError = { ex ->
-                    killSwitch.manualTrigger("Disruptor exception: ${ex.message}")
-                },
-            )
+        disruptor = DisruptorConfig.createDisruptor(
+            handlers = handlers.toTypedArray(),
+            onFatalError = { ex ->
+                logger.error(ex) { "Fatal error - canceling orders and exiting" }
+                commandSender?.cancelAllAndShutdown()
+            },
+        )
 
         disruptor.start()
         logger.info { "Disruptor pipeline started" }
@@ -114,7 +106,7 @@ public class Pipeline(
         eventRecorder?.cleanup()
     }
 
-    public fun getFillCount(): Int = executionHandler.fillCount
+    public fun getCommandSender(): CommandSender? = commandSender
 
     private companion object {
         fun createStrategy(config: BotConfig): Strategy =

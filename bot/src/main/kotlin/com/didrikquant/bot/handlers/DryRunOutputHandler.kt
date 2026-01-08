@@ -1,7 +1,6 @@
 package com.didrikquant.bot.handlers
 
 import com.didrikquant.core.Command
-import com.didrikquant.core.OrderBook
 import com.didrikquant.core.disruptor.MutableEvent
 import mu.KotlinLogging
 import java.math.BigDecimal
@@ -9,9 +8,7 @@ import java.math.RoundingMode
 
 private val logger = KotlinLogging.logger {}
 
-public class DryRunOutputHandler(
-    private val orderBook: OrderBook,
-) : CommandOutputHandler {
+public class DryRunOutputHandler : CommandOutputHandler {
     override fun onEvent(
         event: MutableEvent,
         sequence: Long,
@@ -20,10 +17,11 @@ public class DryRunOutputHandler(
         val commands = event.commands
         if (commands.isEmpty()) return
 
-        val mid = orderBook.midPrice
-        val spread = orderBook.spreadBps
-        val topBid = orderBook.topBids(1).firstOrNull()
-        val topAsk = orderBook.topAsks(1).firstOrNull()
+        val bookSnapshot = event.orderBookSnapshot
+        val mid = bookSnapshot?.midPrice
+        val spread = bookSnapshot?.spreadBps
+        val topBid = bookSnapshot?.bids?.firstOrNull()
+        val topAsk = bookSnapshot?.asks?.firstOrNull()
 
         logger.info {
             "Book: mid=$mid, spread=${spread}bps, " +
@@ -59,6 +57,4 @@ public class DryRunOutputHandler(
             }
         }
     }
-
-    override fun drainCommands(): List<Command> = emptyList()
 }
