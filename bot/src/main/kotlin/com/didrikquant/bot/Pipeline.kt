@@ -1,6 +1,7 @@
 package com.didrikquant.bot
 
 import com.didrikquant.bot.handlers.BookHandler
+import com.didrikquant.bot.handlers.CleanupHandler
 import com.didrikquant.bot.handlers.CommandOutputHandler
 import com.didrikquant.bot.handlers.DryRunOutputHandler
 import com.didrikquant.bot.handlers.ExecutionHandler
@@ -62,7 +63,6 @@ public class Pipeline(
             RiskHandler(
                 riskChecker = riskChecker,
                 orderManager = orderManager,
-                strategyHandler = strategyHandler,
                 symbol = config.symbol,
             )
         executionHandler = ExecutionHandler(orderManager, killSwitch)
@@ -86,6 +86,9 @@ public class Pipeline(
             eventRecorder = EventRecorder(recorderConfig)
             handlers.add(eventRecorder!!)
         }
+
+        // CleanupHandler MUST be last - clears event after all processing
+        handlers.add(CleanupHandler())
 
         disruptor =
             DisruptorConfig.createDisruptor(

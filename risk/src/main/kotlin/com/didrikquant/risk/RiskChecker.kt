@@ -1,8 +1,8 @@
 package com.didrikquant.risk
 
+import com.didrikquant.core.OrderIntent
 import com.didrikquant.core.Side
 import com.didrikquant.core.absoluteValue
-import com.didrikquant.strategy.OrderIntent
 import java.math.BigDecimal
 
 public class RiskChecker(private val config: RiskConfig) {

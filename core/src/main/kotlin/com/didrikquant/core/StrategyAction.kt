@@ -1,4 +1,4 @@
-package com.didrikquant.strategy
+package com.didrikquant.core
 
 import java.math.BigDecimal
 

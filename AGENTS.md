@@ -96,6 +96,63 @@ dq/
 └── tools/            # Build tooling
 ```
 
+## Disruptor Pipeline Architecture
+
+The bot uses LMAX Disruptor for high-performance event processing. Events flow through a chain of handlers.
+
+### Handler Chain
+
+```
+BookHandler → StrategyHandler → RiskHandler → ExecutionHandler → OutputHandler → EventRecorder → CleanupHandler
+```
+
+### Critical Principles
+
+**1. Handlers MUST be independent**
+- Handlers MUST NOT reference each other
+- No constructor injection of other handlers
+- No direct method calls between handlers
+
+**2. All inter-handler communication flows through MutableEvent**
+```kotlin
+// StrategyHandler writes:
+event.actions = actions
+
+// RiskHandler reads:
+val actions = event.actions
+
+// RiskHandler writes:
+event.commands = commands
+
+// OutputHandler reads:
+val commands = event.commands
+```
+
+**3. CleanupHandler must be last**
+- Clears all event fields after processing
+- Prevents memory leaks from ring buffer reuse
+- Always placed after EventRecorder
+
+### MutableEvent Structure
+
+```kotlin
+public class MutableEvent {
+    var event: Event? = null        // Input: market data, order events
+    var actions: List<StrategyAction> = emptyList()  // Strategy → Risk
+    var commands: List<Command> = emptyList()        // Risk → Output
+    
+    fun clear() { /* resets all fields */ }
+}
+```
+
+### Adding New Handlers
+
+1. Create class implementing `EventHandler<MutableEvent>`
+2. Read from event fields set by upstream handlers
+3. Write to event fields for downstream handlers
+4. Add to handler list in `Pipeline.kt` (before CleanupHandler)
+5. NEVER inject or reference other handlers
+
 ## Epoch-Based Strategy Evolution
 
 The harness (`//harness:harness`) orchestrates strategy evolution through live trading epochs.

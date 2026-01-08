@@ -1,7 +1,9 @@
 package com.didrikquant.strategy
 
 import com.didrikquant.core.OrderBook
+import com.didrikquant.core.OrderIntent
 import com.didrikquant.core.Side
+import com.didrikquant.core.StrategyAction
 import com.didrikquant.core.TrackedOrder
 import com.didrikquant.core.roundToTick
 import java.math.BigDecimal

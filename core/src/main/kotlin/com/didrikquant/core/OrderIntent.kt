@@ -1,6 +1,5 @@
-package com.didrikquant.strategy
+package com.didrikquant.core
 
-import com.didrikquant.core.Side
 import java.math.BigDecimal
 
 public data class OrderIntent(

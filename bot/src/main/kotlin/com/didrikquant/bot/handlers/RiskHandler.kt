@@ -1,11 +1,11 @@
 package com.didrikquant.bot.handlers
 
 import com.didrikquant.core.Command
+import com.didrikquant.core.StrategyAction
 import com.didrikquant.core.disruptor.MutableEvent
 import com.didrikquant.execution.OrderManager
 import com.didrikquant.risk.RiskCheckResult
 import com.didrikquant.risk.RiskChecker
-import com.didrikquant.strategy.StrategyAction
 import com.lmax.disruptor.EventHandler
 import mu.KotlinLogging
 
@@ -14,7 +14,6 @@ private val logger = KotlinLogging.logger {}
 public class RiskHandler(
     private val riskChecker: RiskChecker,
     private val orderManager: OrderManager,
-    private val strategyHandler: StrategyHandler,
     private val symbol: String,
 ) : EventHandler<MutableEvent> {
     override fun onEvent(
@@ -22,7 +21,7 @@ public class RiskHandler(
         sequence: Long,
         endOfBatch: Boolean,
     ) {
-        val actions = strategyHandler.consumeActions()
+        val actions = event.actions
         if (actions.isEmpty()) return
 
         val commands = mutableListOf<Command>()
