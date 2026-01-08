@@ -120,7 +120,6 @@ public class Pipeline(
                     )
                 "AgentXrpStrategy" ->
                     AgentXrpStrategy(
-                        spreadBps = config.spreadBps,
                         orderSize = config.orderSize,
                         tickSize = config.tickSize,
                         maxPosition = config.maxPosition,

@@ -10,7 +10,8 @@ import java.math.BigDecimal
 import java.math.RoundingMode
 
 public class AgentXrpStrategy(
-    private val spreadBps: Int = 6,
+    private val minSpreadBps: Int = 4,
+    private val spreadBufferBps: Int = 2,
     private val orderSize: BigDecimal = BigDecimal("15"),
     private val skewFactor: BigDecimal = BigDecimal("0.00015"),
     private val tickSize: BigDecimal = BigDecimal("0.00001"),
@@ -28,8 +29,12 @@ public class AgentXrpStrategy(
 
         val mid = book.midPrice ?: return emptyList()
 
-        // Adaptive spread: widen when top-of-book depth is thin
-        val adaptiveSpreadBps = spreadBps + calculateDepthAdjustment(book, mid)
+        // Market-aware spread: use the larger of market spread or our minimum
+        val marketSpreadBps = book.spreadBps?.toInt() ?: minSpreadBps
+        val baseSpreadBps = maxOf(marketSpreadBps, minSpreadBps)
+
+        // Add buffer on top of market spread + depth adjustment
+        val adaptiveSpreadBps = baseSpreadBps + spreadBufferBps + calculateDepthAdjustment(book, mid)
 
         val spreadDecimal =
             BigDecimal(adaptiveSpreadBps).divide(BigDecimal("20000"), 8, RoundingMode.HALF_UP)
