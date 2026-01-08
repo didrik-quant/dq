@@ -6,7 +6,8 @@ import java.util.Properties
 
 public data class HarnessConfig(
     val instrument: String,
-    val epochDurationMs: Long = 3_600_000L,
+    val epochTradeCount: Int = 50,
+    val epochMaxDurationMs: Long = 7_200_000L, // 2 hours safety timeout
     val gracePeriodMs: Long = 60_000L,
     val strategyClass: String,
     val repoRoot: Path,
@@ -28,7 +29,8 @@ public data class HarnessConfig(
             fun get(key: String): String? = props.getProperty(key) ?: System.getenv(key)
 
             val instrument = get("HARNESS_INSTRUMENT") ?: "PF_XRPUSD"
-            val epochDurationMs = get("HARNESS_EPOCH_DURATION_MS")?.toLongOrNull() ?: 3_600_000L
+            val epochTradeCount = get("HARNESS_EPOCH_TRADE_COUNT")?.toIntOrNull() ?: 50
+            val epochMaxDurationMs = get("HARNESS_EPOCH_MAX_DURATION_MS")?.toLongOrNull() ?: 7_200_000L
             val gracePeriodMs = get("HARNESS_GRACE_PERIOD_MS")?.toLongOrNull() ?: 60_000L
             val strategyClass = get("HARNESS_STRATEGY_CLASS") ?: deriveStrategyClass(instrument)
             val opencodeHost = get("OPENCODE_HOST") ?: "127.0.0.1"
@@ -41,7 +43,8 @@ public data class HarnessConfig(
 
             return HarnessConfig(
                 instrument = instrument,
-                epochDurationMs = epochDurationMs,
+                epochTradeCount = epochTradeCount,
+                epochMaxDurationMs = epochMaxDurationMs,
                 gracePeriodMs = gracePeriodMs,
                 strategyClass = strategyClass,
                 repoRoot = repoRoot,

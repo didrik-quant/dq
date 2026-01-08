@@ -33,7 +33,8 @@ public fun main(args: Array<String>): Unit =
             buildString {
                 append("Starting Kraken Futures HFT Market Maker")
                 if (dryRun) append(" [DRY-RUN MODE]")
-                parsedArgs.epochDurationMs?.let { append(" [EPOCH: ${it}ms]") }
+                parsedArgs.epochTradeCount?.let { append(" [EPOCH: $it trades]") }
+                parsedArgs.epochMaxDurationMs?.let { append(" [MAX: ${it}ms]") }
             }
         }
 
@@ -51,7 +52,8 @@ public fun main(args: Array<String>): Unit =
                 orderSize = BigDecimal("10"),
                 requoteIntervalMs = 2000,
                 dryRun = dryRun,
-                epochDurationMs = parsedArgs.epochDurationMs,
+                epochTradeCount = parsedArgs.epochTradeCount,
+                epochMaxDurationMs = parsedArgs.epochMaxDurationMs,
                 strategyClass = parsedArgs.strategyClass,
             )
 
@@ -189,7 +191,8 @@ public fun main(args: Array<String>): Unit =
             buildString {
                 append("Futures MM Bot running")
                 if (dryRun) append(" in DRY-RUN mode (no orders will be placed)")
-                botConfig.epochDurationMs?.let { append(". Will shutdown after ${it / 1000}s") }
+                botConfig.epochTradeCount?.let { append(". Will shutdown after $it trades") }
+                botConfig.epochMaxDurationMs?.let { append(" (or ${it / 1000}s max)") }
                 append(". Press Ctrl+C to stop.")
             }
         logger.info { runMessage }
@@ -219,10 +222,22 @@ public fun main(args: Array<String>): Unit =
                 break
             }
 
-            botConfig.epochDurationMs?.let { epochMs ->
+            botConfig.epochTradeCount?.let { targetTrades ->
+                val fillCount = pipeline.getFillCount()
+                if (fillCount >= targetTrades) {
+                    logger.info { "Epoch trade target reached ($fillCount trades). Shutting down." }
+                    if (!dryRun && privateWs != null) {
+                        privateWs.sendCommand(Command.CancelAll(botConfig.symbol))
+                        delay(1000)
+                    }
+                    break
+                }
+            }
+
+            botConfig.epochMaxDurationMs?.let { maxMs ->
                 val elapsed = System.currentTimeMillis() - startTimeMs
-                if (elapsed >= epochMs) {
-                    logger.info { "Epoch duration reached (${elapsed}ms). Shutting down." }
+                if (elapsed >= maxMs) {
+                    logger.info { "Epoch max duration reached (${elapsed}ms). Shutting down." }
                     if (!dryRun && privateWs != null) {
                         privateWs.sendCommand(Command.CancelAll(botConfig.symbol))
                         delay(1000)
@@ -242,21 +257,24 @@ public fun main(args: Array<String>): Unit =
 private data class ParsedArgs(
     val dryRun: Boolean = false,
     val symbol: String = "PF_XRPUSD",
-    val epochDurationMs: Long? = null,
+    val epochTradeCount: Int? = null,
+    val epochMaxDurationMs: Long? = null,
     val strategyClass: String = "SimpleMarketMaker",
 )
 
 private fun parseArgs(args: Array<String>): ParsedArgs {
     var dryRun = false
     var symbol = "PF_XRPUSD"
-    var epochDurationMs: Long? = null
+    var epochTradeCount: Int? = null
+    var epochMaxDurationMs: Long? = null
     var strategyClass = "SimpleMarketMaker"
 
     for (arg in args) {
         when {
             arg == "--dry-run" -> dryRun = true
             arg.startsWith("--symbol=") -> symbol = arg.substringAfter("=")
-            arg.startsWith("--epoch-duration=") -> epochDurationMs = arg.substringAfter("=").toLongOrNull()
+            arg.startsWith("--epoch-trades=") -> epochTradeCount = arg.substringAfter("=").toIntOrNull()
+            arg.startsWith("--epoch-max-duration=") -> epochMaxDurationMs = arg.substringAfter("=").toLongOrNull()
             arg.startsWith("--strategy=") -> strategyClass = arg.substringAfter("=")
         }
     }
@@ -264,7 +282,8 @@ private fun parseArgs(args: Array<String>): ParsedArgs {
     return ParsedArgs(
         dryRun = dryRun,
         symbol = symbol,
-        epochDurationMs = epochDurationMs,
+        epochTradeCount = epochTradeCount,
+        epochMaxDurationMs = epochMaxDurationMs,
         strategyClass = strategyClass,
     )
 }

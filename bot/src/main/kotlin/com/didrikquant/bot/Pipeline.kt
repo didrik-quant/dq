@@ -111,6 +111,8 @@ public class Pipeline(
         eventRecorder?.cleanup()
     }
 
+    public fun getFillCount(): Int = executionHandler.fillCount
+
     private companion object {
         fun createStrategy(config: BotConfig): Strategy =
             when (config.strategyClass) {

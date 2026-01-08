@@ -18,7 +18,8 @@ public class Harness(private val config: HarnessConfig) {
     public fun run() {
         logger.info { "Starting harness for ${config.instrument}" }
         logger.info { "Strategy class: ${config.strategyClass}" }
-        logger.info { "Epoch duration: ${config.epochDurationMs}ms" }
+        logger.info { "Epoch trades: ${config.epochTradeCount}" }
+        logger.info { "Epoch max duration: ${config.epochMaxDurationMs}ms (safety timeout)" }
         logger.info { "Repo root: ${config.repoRoot}" }
         logger.info { "Opencode server: ${config.opencodeHost}:${config.opencodePort}" }
         logger.info { "Opencode model: ${config.opencodeModel}" }
@@ -169,13 +170,14 @@ public class Harness(private val config: HarnessConfig) {
     }
 
     private fun runBot(worktreePath: Path): BotResult {
-        logger.info { "Running bot for ${config.epochDurationMs}ms" }
+        logger.info { "Running bot for ${config.epochTradeCount} trades (max ${config.epochMaxDurationMs}ms)" }
 
         val logFile = Files.createTempFile("bot-output", ".log")
 
         val args = listOf(
             "bazel", "run", "//bot", "--",
-            "--epoch-duration=${config.epochDurationMs}",
+            "--epoch-trades=${config.epochTradeCount}",
+            "--epoch-max-duration=${config.epochMaxDurationMs}",
             "--strategy=${config.strategyClass}",
         )
         val processBuilder = ProcessBuilder(args)
@@ -187,7 +189,7 @@ public class Harness(private val config: HarnessConfig) {
         config.krakenApiSecret?.let { processBuilder.environment()["KRAKEN_API_SECRET"] = it }
 
         val process = processBuilder.start()
-        val timeoutMs = config.epochDurationMs + config.gracePeriodMs
+        val timeoutMs = config.epochMaxDurationMs + config.gracePeriodMs
         val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
 
         if (!completed) {

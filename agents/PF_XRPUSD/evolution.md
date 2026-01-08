@@ -6,7 +6,7 @@ This file tracks the evolution of AgentXrpStrategy.kt across epochs.
 
 Each epoch:
 1. You modify the strategy in `strategy/src/main/kotlin/com/didrikquant/strategy/AgentXrpStrategy.kt`
-2. The strategy runs live for 1 hour
+2. The strategy runs live until 50 trades complete (or 2 hour safety timeout)
 3. Results (Sharpe ratio) are appended here
 
 ## Tools Available

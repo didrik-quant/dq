@@ -106,7 +106,7 @@ The harness (`//harness:harness`) orchestrates strategy evolution through live t
 2. **Agent receives a prompt** to improve the strategy
 3. **Agent modifies** `strategy/src/main/kotlin/.../AgentXrpStrategy.kt`
 4. **Agent runs** `bazel build //...` to verify changes compile
-5. **Harness runs the bot** live for the epoch duration
+5. **Harness runs the bot** live until trade target is reached (or max duration)
 6. **Results are logged** to `agents/<instrument>/evolution.md`
 7. **Changes are merged** back to main (if successful)
 8. **Loop repeats**
@@ -136,7 +136,8 @@ Set in `~/.dq/harness.env`:
 |----------|-------------|---------|
 | `HARNESS_REPO_ROOT` | Path to dq repo | (required) |
 | `HARNESS_INSTRUMENT` | Trading instrument | `PF_XRPUSD` |
-| `HARNESS_EPOCH_DURATION_MS` | Epoch duration in ms | `3600000` (1 hour) |
+| `HARNESS_EPOCH_TRADE_COUNT` | Number of trades per epoch | `50` |
+| `HARNESS_EPOCH_MAX_DURATION_MS` | Safety timeout in ms | `7200000` (2 hours) |
 | `HARNESS_STRATEGY_CLASS` | Strategy class name | `AgentXrpStrategy` |
 | `OPENCODE_MODEL` | LLM model to use | `anthropic/claude-opus-4-5` |
 | `KRAKEN_API_KEY` | Kraken API key | (required) |
