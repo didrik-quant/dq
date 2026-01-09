@@ -21,6 +21,9 @@ public class ClaudeCodeClient {
 
         logger.info { "Starting Claude process..." }
         val process = ProcessBuilder(
+            "script",
+            "-q",
+            "/dev/null",
             claudePath,
             "--model",
             "claude-opus-4-5-20251101",
@@ -39,20 +42,8 @@ public class ClaudeCodeClient {
         val outputThread = Thread {
             logger.debug { "Output reader thread started" }
             try {
-                val reader = java.io.InputStreamReader(process.inputStream)
-                val sb = StringBuilder()
-                var ch: Int
-                while (reader.read().also { ch = it } != -1) {
-                    if (ch == '\n'.code) {
-                        val line = sb.toString()
-                        sb.clear()
-                        parseAndLogEvent(line)
-                    } else {
-                        sb.append(ch.toChar())
-                    }
-                }
-                if (sb.isNotEmpty()) {
-                    parseAndLogEvent(sb.toString())
+                process.inputStream.bufferedReader().forEachLine { line ->
+                    parseAndLogEvent(line)
                 }
             } catch (e: Exception) {
                 logger.error(e) { "Error reading Claude output" }
