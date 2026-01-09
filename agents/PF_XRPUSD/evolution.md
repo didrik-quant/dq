@@ -112,3 +112,31 @@ com.didrikquant.core.BotFatalException: RISK BREACH: Max open orders reached: 10
 ### Attempted Changes
 
 No changes
+
+---
+
+## Epoch 4 - FAILED at 2026-01-09 22:52 UTC
+
+### Failure: RUNTIME_CRASH
+
+```
+com.didrikquant.core.BotFatalException: Invalid order transition: Order is in terminal state FILLED, cannot apply Amended(clOrdId=b810c92ba4f242cc97, orderId=a0cc6fc1-f980-491b-9e6b-d48fa25ed3a2, previousOrderId=, newPrice=2.0957, newQty=null, timestamp=1767999160936)
+	at com.didrikquant.bot.handlers.TradingHandler.processOrderEvents(TradingHandler.kt:68)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:42)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:25)
+	at com.lmax.disruptor.BatchEventProcessor.processEvents(BatchEventProcessor.java:167)
+	at com.lmax.disruptor.BatchEventProcessor.run(BatchEventProcessor.java:122)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+23:52:40.944 [1;31mERROR[0;39m [36mPipeline            [0;39m - Fatal error - canceling orders and exiting
+com.didrikquant.core.BotFatalException: Invalid order transition: Order is in terminal state FILLED, cannot apply Amended(clOrdId=b810c92ba4f242cc97, orderId=a0cc6fc1-f980-491b-9e6b-d48fa25ed3a2, previousOrderId=, newPrice=2.0957, newQty=null, timestamp=1767999160936)
+	at com.didrikquant.bot.handlers.TradingHandler.processOrderEvents(TradingHandler.kt:68)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:42)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:25)
+	at com.lmax.disruptor.BatchEventProcessor.processEvents(BatchEventProcessor.java:167)
+	at com.lmax.disruptor.BatchEventProcessor.run(BatchEventProcessor.java:122)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+```
+
+### Attempted Changes
+
+No changes
