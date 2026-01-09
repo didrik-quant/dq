@@ -10,7 +10,6 @@ import com.lmax.disruptor.dsl.ProducerType
 import mu.KotlinLogging
 import java.util.concurrent.ThreadFactory
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
 
@@ -43,13 +42,11 @@ public object DisruptorConfig {
             override fun handleEventException(ex: Throwable, sequence: Long, event: MutableEvent) {
                 logger.error(ex) { "Fatal error at sequence $sequence - shutting down" }
                 onFatalError?.invoke(ex)
-                exitProcess(1)
             }
 
             override fun handleOnStartException(ex: Throwable) {
                 logger.error(ex) { "Disruptor start exception - shutting down" }
                 onFatalError?.invoke(ex)
-                exitProcess(1)
             }
 
             override fun handleOnShutdownException(ex: Throwable) {

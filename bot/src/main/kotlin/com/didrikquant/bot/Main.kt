@@ -1,6 +1,5 @@
 package com.didrikquant.bot
 
-import com.didrikquant.core.Command
 import com.didrikquant.kraken.KrakenConfig
 import com.didrikquant.kraken.KrakenPrivateWs
 import com.didrikquant.kraken.KrakenPublicWs
@@ -22,6 +21,9 @@ import kotlinx.serialization.json.jsonPrimitive
 import mu.KotlinLogging
 import java.math.BigDecimal
 import java.math.RoundingMode
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 private val logger = KotlinLogging.logger {}
 
@@ -109,8 +111,19 @@ public fun main(args: Array<String>): Unit = runBlocking {
 
     logger.info { "Config: symbol=${botConfig.symbol}, strategy=${botConfig.strategyClass}" }
 
+    // Shutdown coordinator
+    val shutdownLatch = CountDownLatch(1)
+    val exitCode = AtomicInteger(0)
+
     val pipeline = Pipeline(botConfig)
-    val disruptor = pipeline.start(recorderConfig, restClient)
+    val disruptor = pipeline.start(
+        recorderConfig = recorderConfig,
+        restClient = restClient,
+        onShutdown = {
+            exitCode.set(1)
+            shutdownLatch.countDown()
+        },
+    )
     val ringBuffer = disruptor.ringBuffer
 
     val publicWs = KrakenPublicWs(krakenConfig, ringBuffer, listOf(botConfig.symbol))
@@ -153,24 +166,49 @@ public fun main(args: Array<String>): Unit = runBlocking {
         delay(100)
     }
 
-    // Shutdown hook for graceful exit
+    // Shutdown hook for Ctrl+C - just signals the watchdog
     Runtime.getRuntime().addShutdownHook(Thread {
-        runBlocking {
-            logger.info { "Shutdown initiated" }
-            if (!dryRun && privateWs != null) {
-                logger.info { "Canceling all orders..." }
-                privateWs.sendCommand(Command.CancelAll(botConfig.symbol))
-                delay(1000)
-            }
+        logger.info { "Shutdown signal received" }
+        shutdownLatch.countDown()
+    })
+
+    // Watchdog thread - handles cleanup with hard timeout
+    Thread {
+        shutdownLatch.await(Long.MAX_VALUE, TimeUnit.MILLISECONDS)
+        logger.info { "Shutdown initiated - cleanup starting (5s timeout)" }
+
+        val cleanupStart = System.currentTimeMillis()
+        runCatching {
+            scope.cancel()
             publicWs.close()
             privateWs?.close()
             pipeline.cleanupOldRecordings()
             pipeline.stop()
             restClient?.close()
-            scope.cancel()
-            logger.info { "Shutdown complete" }
+        }.onFailure { ex ->
+            logger.error(ex) { "Error during cleanup" }
         }
-    })
+
+        val elapsed = System.currentTimeMillis() - cleanupStart
+        logger.info { "Cleanup completed in ${elapsed}ms - exiting with code ${exitCode.get()}" }
+        Runtime.getRuntime().halt(exitCode.get())
+    }.apply {
+        isDaemon = true
+        name = "shutdown-watchdog"
+        start()
+    }
+
+    // Hard timeout thread - forces exit if watchdog hangs
+    Thread {
+        if (!shutdownLatch.await(Long.MAX_VALUE, TimeUnit.MILLISECONDS)) return@Thread
+        Thread.sleep(5000)
+        logger.error { "Shutdown timeout exceeded - forcing exit" }
+        Runtime.getRuntime().halt(exitCode.get())
+    }.apply {
+        isDaemon = true
+        name = "shutdown-timeout"
+        start()
+    }
 
     // Command sending coroutine - polls commands from queue and sends via WebSocket
     // This is required because OutputHandler runs on Disruptor thread (non-coroutine)
@@ -202,17 +240,9 @@ public fun main(args: Array<String>): Unit = runBlocking {
     }
     logger.info { runMessage }
 
-    // The bot now runs until:
-    // 1. EpochGuardHandler throws BotFatalException (trade count or duration reached)
-    // 2. ExecutionUpdateHandler throws BotFatalException (max loss exceeded)
-    // 3. Any handler throws an exception (strategy error, etc.)
-    // 4. User presses Ctrl+C (shutdown hook)
-    //
-    // The Disruptor exception handler will:
-    // 1. Call CommandSender.cancelAllAndShutdown()
-    // 2. Call System.exit(1)
-    //
-    // No polling loops needed! The pipeline handles everything.
+    // Block forever - watchdog handles cleanup and calls halt() to exit
+    shutdownLatch.await()
+    Thread.sleep(Long.MAX_VALUE)
 }
 
 private data class ParsedArgs(

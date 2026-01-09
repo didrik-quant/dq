@@ -41,6 +41,7 @@ public class Pipeline(
     public fun start(
         recorderConfig: RecorderConfig? = null,
         restClient: KrakenRestClient? = null,
+        onShutdown: (() -> Unit)? = null,
     ): Disruptor<MutableEvent> {
         commandSender = CommandSender(restClient, config.symbol)
 
@@ -81,6 +82,7 @@ public class Pipeline(
             onFatalError = { ex ->
                 logger.error(ex) { "Fatal error - canceling orders and exiting" }
                 commandSender?.cancelAllAndShutdown()
+                onShutdown?.invoke()
             },
         )
 
