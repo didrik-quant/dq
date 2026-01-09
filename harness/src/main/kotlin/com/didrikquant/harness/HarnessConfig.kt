@@ -11,9 +11,6 @@ public data class HarnessConfig(
     val gracePeriodMs: Long = 60_000L,
     val strategyClass: String,
     val repoRoot: Path,
-    val opencodeHost: String = "127.0.0.1",
-    val opencodePort: Int = 4096,
-    val opencodeModel: String = "anthropic/claude-opus-4-5",
     val krakenApiKey: String? = null,
     val krakenApiSecret: String? = null,
 ) {
@@ -33,9 +30,6 @@ public data class HarnessConfig(
             val epochMaxDurationMs = get("HARNESS_EPOCH_MAX_DURATION_MS")?.toLongOrNull() ?: 7_200_000L
             val gracePeriodMs = get("HARNESS_GRACE_PERIOD_MS")?.toLongOrNull() ?: 60_000L
             val strategyClass = get("HARNESS_STRATEGY_CLASS") ?: deriveStrategyClass(instrument)
-            val opencodeHost = get("OPENCODE_HOST") ?: "127.0.0.1"
-            val opencodePort = get("OPENCODE_PORT")?.toIntOrNull() ?: 4096
-            val opencodeModel = get("OPENCODE_MODEL") ?: "anthropic/claude-opus-4-5"
             val krakenApiKey = get("KRAKEN_API_KEY")
             val krakenApiSecret = get("KRAKEN_API_SECRET")
             val repoRoot = get("HARNESS_REPO_ROOT")?.let { Path.of(it) }
@@ -48,9 +42,6 @@ public data class HarnessConfig(
                 gracePeriodMs = gracePeriodMs,
                 strategyClass = strategyClass,
                 repoRoot = repoRoot,
-                opencodeHost = opencodeHost,
-                opencodePort = opencodePort,
-                opencodeModel = opencodeModel,
                 krakenApiKey = krakenApiKey,
                 krakenApiSecret = krakenApiSecret,
             )
