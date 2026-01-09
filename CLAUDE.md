@@ -30,7 +30,7 @@ Delete obsolete code immediately. No deprecated APIs, no compatibility shims. Up
 - `risk/` - Risk checking
 - `kraken-client/` - Kraken Futures API client
 - `replay/` - Traffic recording
-- `cli/` - CLI tools (dq fills, dq book)
+- `cli/` - CLI tools (dq epoch)
 - `harness/` - Epoch-based evolution harness
 
 ## Disruptor Pipeline
