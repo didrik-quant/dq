@@ -5,10 +5,14 @@ import com.didrikquant.core.Event
 import com.didrikquant.core.OrderBookSnapshot
 import com.didrikquant.core.PositionSnapshot
 import com.didrikquant.orderstate.OrderSnapshot
+import com.didrikquant.orderstate.OrderStateEvent
 
 public class MutableEvent {
     @Volatile
     public var event: Event? = null
+
+    @Volatile
+    public var orderEvent: OrderStateEvent? = null
 
     @Volatile
     public var orderBookSnapshot: OrderBookSnapshot? = null
@@ -24,6 +28,7 @@ public class MutableEvent {
 
     public fun clear() {
         event = null
+        orderEvent = null
         orderBookSnapshot = null
         openOrders = emptyList()
         positionSnapshot = null
