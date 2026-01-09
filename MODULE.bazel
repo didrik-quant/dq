@@ -45,6 +45,12 @@ maven.install(
 
         # Kotlin test
         "org.jetbrains.kotlin:kotlin-test:2.0.21",
+
+        # Kotest for property-based testing
+        "io.kotest:kotest-runner-junit5-jvm:5.9.1",
+        "io.kotest:kotest-assertions-core-jvm:5.9.1",
+        "io.kotest:kotest-property-jvm:5.9.1",
+        "io.kotest:kotest-framework-api-jvm:5.9.1",
     ],
     repositories = [
         "https://repo1.maven.org/maven2",

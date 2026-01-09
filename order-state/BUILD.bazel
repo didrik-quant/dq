@@ -1,0 +1,37 @@
+load("@rules_kotlin//kotlin:jvm.bzl", "kt_jvm_library", "kt_jvm_test")
+load("@rules_kotlin//kotlin:lint.bzl", "ktlint_fix", "ktlint_test")
+
+kt_jvm_library(
+    name = "order-state",
+    srcs = glob(["src/main/kotlin/**/*.kt"]),
+    visibility = ["//visibility:public"],
+)
+
+kt_jvm_test(
+    name = "order-state-test",
+    srcs = glob(["src/test/kotlin/**/*.kt"]),
+    deps = [
+        ":order-state",
+        "@maven//:io_kotest_kotest_assertions_core_jvm",
+        "@maven//:io_kotest_kotest_framework_api_jvm",
+        "@maven//:io_kotest_kotest_property_jvm",
+        "@maven//:io_kotest_kotest_runner_junit5_jvm",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_junit_jupiter_junit_jupiter_engine",
+        "@maven//:org_junit_platform_junit_platform_launcher",
+    ],
+    main_class = "io.kotest.engine.launcher.MainKt",
+)
+
+ktlint_test(
+    name = "ktlint",
+    srcs = glob(["src/main/kotlin/**/*.kt"]) + glob(["src/test/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
+    tags = ["ktlint"],
+)
+
+ktlint_fix(
+    name = "ktlint_fix",
+    srcs = glob(["src/main/kotlin/**/*.kt"]) + glob(["src/test/kotlin/**/*.kt"]),
+    config = "//:ktlint_config",
+)
