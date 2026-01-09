@@ -60,7 +60,7 @@ public class Harness(private val config: HarnessConfig) {
             }
 
             val startTime = Instant.now()
-            val botResult = runBot(worktreePath, buildResult.bazelBinPath)
+            val botResult = runBot(worktreePath, buildResult.bazelBinPath, epoch)
             val endTime = Instant.now()
 
             if (botResult.crashed) {
@@ -240,7 +240,7 @@ public class Harness(private val config: HarnessConfig) {
         return errorLines.ifEmpty { "Build failed with unknown error" }
     }
 
-    private fun runBot(worktreePath: Path, bazelBinPath: String): BotResult {
+    private fun runBot(worktreePath: Path, bazelBinPath: String, epoch: Int): BotResult {
         logger.info { "Running bot for ${config.epochTradeCount} trades (max ${config.epochMaxDurationMs}ms)" }
 
         // Run the bot launcher directly instead of via `bazel run` to ensure
