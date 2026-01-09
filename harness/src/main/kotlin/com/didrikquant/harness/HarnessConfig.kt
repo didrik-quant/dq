@@ -16,6 +16,8 @@ public data class HarnessConfig(
     val krakenApiSecret: String? = null,
     val dataDir: Path,
     val startingEquity: BigDecimal,
+    val skipAgent: Boolean = false,
+    val dryRun: Boolean = false,
 ) {
     val agentDir: Path get() = repoRoot.resolve("agents").resolve(instrument)
     val evolutionLogPath: Path get() = agentDir.resolve("evolution.md")
@@ -41,6 +43,8 @@ public data class HarnessConfig(
                 ?: BigDecimal(10000)
             val repoRoot = get("HARNESS_REPO_ROOT")?.let { Path.of(it) }
                 ?: error("HARNESS_REPO_ROOT must be set in ~/.dq/harness.env")
+            val skipAgent = get("HARNESS_SKIP_AGENT")?.toBooleanStrictOrNull() ?: false
+            val dryRun = get("HARNESS_DRY_RUN")?.toBooleanStrictOrNull() ?: false
 
             return HarnessConfig(
                 instrument = instrument,
@@ -53,6 +57,8 @@ public data class HarnessConfig(
                 krakenApiSecret = krakenApiSecret,
                 dataDir = dataDir,
                 startingEquity = startingEquity,
+                skipAgent = skipAgent,
+                dryRun = dryRun,
             )
         }
 

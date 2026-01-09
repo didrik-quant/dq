@@ -24,6 +24,8 @@ public class Harness(private val config: HarnessConfig) {
         logger.info { "Repo root: ${config.repoRoot}" }
         logger.info { "Data dir: ${config.dataDir}" }
         logger.info { "Starting equity: ${config.startingEquity}" }
+        logger.info { "Skip agent: ${config.skipAgent}" }
+        logger.info { "Dry run: ${config.dryRun}" }
 
         Files.createDirectories(config.agentDir)
 
@@ -41,12 +43,16 @@ public class Harness(private val config: HarnessConfig) {
         val worktreePath = worktreeManager.create(branchName)
 
         try {
-            spawnAgent(worktreePath, epoch)
+            if (config.skipAgent) {
+                logger.info { "Skipping agent (HARNESS_SKIP_AGENT=true)" }
+            } else {
+                spawnAgent(worktreePath, epoch)
+            }
 
             val diff = worktreeManager.diff(worktreePath)
 
             val buildResult = build(worktreePath)
-            if (!buildResult.success) {
+            if (!buildResult.success || buildResult.bazelBinPath == null) {
                 logger.error { "Build failed, logging failure and continuing to next epoch" }
                 evolutionLog.appendFailure(epoch, diff, "BUILD_FAILED", buildResult.error ?: "Unknown error")
                 commitEvolutionLog("Epoch $epoch: BUILD_FAILED")
@@ -54,7 +60,7 @@ public class Harness(private val config: HarnessConfig) {
             }
 
             val startTime = Instant.now()
-            val botResult = runBot(worktreePath)
+            val botResult = runBot(worktreePath, buildResult.bazelBinPath)
             val endTime = Instant.now()
 
             if (botResult.crashed) {
@@ -176,8 +182,7 @@ public class Harness(private val config: HarnessConfig) {
             Read the evolution log to understand the history of changes and their results.
             $crashContext
             TOOLS:
-            - `dq fills` - View fills from last epoch
-            - `dq book --at <timestamp>` - View order book at a specific timestamp
+            - `dq epoch --from <start_ms> --to <end_ms>` - Analyze epoch metrics (P&L, fills, risk, Sharpe)
 
             WORKFLOW:
             1. Read the evolution log to understand past changes and results
@@ -190,7 +195,7 @@ public class Harness(private val config: HarnessConfig) {
             """.trimIndent()
     }
 
-    private data class BuildResult(val success: Boolean, val error: String? = null)
+    private data class BuildResult(val success: Boolean, val bazelBinPath: String? = null, val error: String? = null)
     private data class BotResult(val crashed: Boolean, val exitCode: Int, val error: String? = null)
 
     private fun build(worktreePath: Path): BuildResult {
@@ -204,12 +209,27 @@ public class Harness(private val config: HarnessConfig) {
         val output = process.inputStream.bufferedReader().readText()
         val exitCode = process.waitFor()
 
-        return if (exitCode == 0) {
-            BuildResult(success = true)
-        } else {
+        if (exitCode != 0) {
             logger.error { "Build failed:\n$output" }
-            BuildResult(success = false, error = extractBuildError(output))
+            return BuildResult(success = false, error = extractBuildError(output))
         }
+
+        // Get the actual bazel-bin path since Bazel 8 doesn't create bazel-bin symlinks in fresh workspaces
+        val infoProcess = ProcessBuilder("bazel", "info", "bazel-bin")
+            .directory(worktreePath.toFile())
+            .redirectErrorStream(true)
+            .start()
+
+        val bazelBinPath = infoProcess.inputStream.bufferedReader().readText().trim()
+        val infoExitCode = infoProcess.waitFor()
+
+        if (infoExitCode != 0 || bazelBinPath.isEmpty()) {
+            logger.error { "Failed to get bazel-bin path" }
+            return BuildResult(success = false, error = "Failed to get bazel-bin path")
+        }
+
+        logger.debug { "bazel-bin path: $bazelBinPath" }
+        return BuildResult(success = true, bazelBinPath = bazelBinPath)
     }
 
     private fun extractBuildError(output: String): String {
@@ -220,24 +240,35 @@ public class Harness(private val config: HarnessConfig) {
         return errorLines.ifEmpty { "Build failed with unknown error" }
     }
 
-    private fun runBot(worktreePath: Path): BotResult {
+    private fun runBot(worktreePath: Path, bazelBinPath: String): BotResult {
         logger.info { "Running bot for ${config.epochTradeCount} trades (max ${config.epochMaxDurationMs}ms)" }
 
         // Run the bot launcher directly instead of via `bazel run` to ensure
         // clean process exit propagation. The bot was already built by build().
-        val botLauncher = worktreePath.resolve("bazel-bin/bot/bot").toString()
-        val args = listOf(
-            botLauncher,
-            "--epoch-trades=${config.epochTradeCount}",
-            "--epoch-max-duration=${config.epochMaxDurationMs}",
-            "--strategy=${config.strategyClass}",
-        )
+        val botLauncher = "$bazelBinPath/bot/bot"
+        logger.info { "Bot launcher: $botLauncher" }
+        logger.info { "Working directory: $worktreePath" }
+        val args = buildList {
+            add(botLauncher)
+            add("--epoch-trades=${config.epochTradeCount}")
+            add("--epoch-max-duration=${config.epochMaxDurationMs}")
+            add("--strategy=${config.strategyClass}")
+            if (config.dryRun) add("--dry-run")
+        }
         val processBuilder = ProcessBuilder(args)
             .directory(worktreePath.toFile())
             .redirectErrorStream(true)
 
-        config.krakenApiKey?.let { processBuilder.environment()["KRAKEN_API_KEY"] = it }
-        config.krakenApiSecret?.let { processBuilder.environment()["KRAKEN_API_SECRET"] = it }
+        // Clear bazel runfiles env vars so the bot uses its own runfiles, not the harness's
+        val env = processBuilder.environment()
+        env.remove("JAVA_RUNFILES")
+        env.remove("RUNFILES_DIR")
+        env.remove("RUNFILES_MANIFEST_FILE")
+        env.remove("RUNFILES_MANIFEST_ONLY")
+        env.remove("TEST_SRCDIR")
+
+        config.krakenApiKey?.let { env["KRAKEN_API_KEY"] = it }
+        config.krakenApiSecret?.let { env["KRAKEN_API_SECRET"] = it }
 
         val process = processBuilder.start()
         val outputCapture = StringBuilder()
