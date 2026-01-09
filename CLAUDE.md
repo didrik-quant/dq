@@ -53,3 +53,10 @@ No polling loops, spinlocks, or busy-waiting. All control flow through Disruptor
 ## Git Workflow
 
 Always create Pull Requests for code changes. Never merge directly to main. Use feature branches and worktrees for isolation.
+
+## Superpowers Skills
+
+Always use superpowers skills when:
+- **Implementing features** - use brainstorming, writing-plans, test-driven-development
+- **Debugging** - use systematic-debugging before proposing fixes
+- **Brainstorming** - use brainstorming skill before any creative or design work
