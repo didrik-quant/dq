@@ -196,7 +196,12 @@ public class Harness(private val config: HarnessConfig) {
     }
 
     private data class BuildResult(val success: Boolean, val bazelBinPath: String? = null, val error: String? = null)
-    private data class BotResult(val crashed: Boolean, val exitCode: Int, val error: String? = null)
+    private data class BotResult(
+        val crashed: Boolean,
+        val exitCode: Int,
+        val error: String? = null,
+        val logFile: Path? = null,
+    )
 
     private fun build(worktreePath: Path): BuildResult {
         logger.info { "Building bot in $worktreePath" }
@@ -313,9 +318,9 @@ public class Harness(private val config: HarnessConfig) {
 
         return if (exitCode != 0) {
             val error = extractCrashError(outputCapture.toString())
-            BotResult(crashed = true, exitCode = exitCode, error = error)
+            BotResult(crashed = true, exitCode = exitCode, error = error, logFile = logFile)
         } else {
-            BotResult(crashed = false, exitCode = exitCode)
+            BotResult(crashed = false, exitCode = exitCode, logFile = logFile)
         }
     }
 
