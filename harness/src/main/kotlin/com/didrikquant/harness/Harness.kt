@@ -14,6 +14,7 @@ public class Harness(private val config: HarnessConfig) {
     private val worktreeManager = WorktreeManager(config.repoRoot)
     private val evolutionLog = EvolutionLog(config.evolutionLogPath)
     private val claudeClient = ClaudeCodeClient()
+    private val sharpeCalculator = SharpeCalculator(config.dataDir)
 
     public fun run() {
         logger.info { "Starting harness for ${config.instrument}" }
@@ -21,6 +22,8 @@ public class Harness(private val config: HarnessConfig) {
         logger.info { "Epoch trades: ${config.epochTradeCount}" }
         logger.info { "Epoch max duration: ${config.epochMaxDurationMs}ms (safety timeout)" }
         logger.info { "Repo root: ${config.repoRoot}" }
+        logger.info { "Data dir: ${config.dataDir}" }
+        logger.info { "Starting equity: ${config.startingEquity}" }
 
         Files.createDirectories(config.agentDir)
 
@@ -67,7 +70,20 @@ public class Harness(private val config: HarnessConfig) {
                 return
             }
 
-            evolutionLog.append(epoch, startTime, endTime, diff, BigDecimal.ZERO)
+            val sharpe = try {
+                sharpeCalculator.calculate(
+                    startTime = startTime,
+                    endTime = endTime,
+                    symbol = config.instrument,
+                    startingEquity = config.startingEquity,
+                )
+            } catch (e: Exception) {
+                logger.warn(e) { "Sharpe calculation failed, proceeding with zero" }
+                null
+            }
+
+            logger.info { "Epoch $epoch Sharpe: ${sharpe ?: "insufficient data"}" }
+            evolutionLog.append(epoch, startTime, endTime, diff, sharpe ?: BigDecimal.ZERO)
 
             worktreeManager.commitAndMerge(worktreePath, branchName, "Epoch $epoch: ${config.instrument}")
         } finally {
