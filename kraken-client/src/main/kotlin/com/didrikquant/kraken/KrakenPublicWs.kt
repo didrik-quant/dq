@@ -113,7 +113,9 @@ public class KrakenPublicWs(
 
             val event = obj["event"]?.jsonPrimitive?.contentOrNull
             if (event == "subscribed") {
-                logger.info { "Subscription confirmed: $text" }
+                val feed = obj["feed"]?.jsonPrimitive?.contentOrNull
+                val productIds = obj["product_ids"]?.jsonArray?.map { it.jsonPrimitive.content }
+                logger.info { "Subscription confirmed: $feed for $productIds" }
             } else if (event == "error") {
                 logger.error { "WS error: $text" }
             }
