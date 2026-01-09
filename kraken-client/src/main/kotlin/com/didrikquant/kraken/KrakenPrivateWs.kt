@@ -39,6 +39,7 @@ public class KrakenPrivateWs(
 
     @Volatile
     private var ready: Boolean = false
+
     @Volatile
     private var shutdown: Boolean = false
     private val subscribedFeeds = mutableSetOf<String>()
