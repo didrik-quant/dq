@@ -119,10 +119,10 @@ public class TradingHandler(
                 }
 
                 val position = positionTracker.getPosition()
-                val activeOrders = orderStore.activeOrders()
+                val allOrders = orderStore.allOrders()
 
                 val actions = try {
-                    strategy.onBookSnapshot(bookSnapshot, position, activeOrders)
+                    strategy.onBookSnapshot(bookSnapshot, position, allOrders)
                 } catch (e: Exception) {
                     throw BotFatalException("Strategy exception: ${e.message}", e)
                 }

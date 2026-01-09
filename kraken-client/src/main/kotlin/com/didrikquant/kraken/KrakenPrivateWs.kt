@@ -16,6 +16,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.*
 import mu.KotlinLogging
 import java.math.BigDecimal
+import java.time.Instant
 
 private val logger = KotlinLogging.logger {}
 
@@ -226,7 +227,23 @@ public class KrakenPrivateWs(
         if (result == "success") {
             val sendStatus = response["sendStatus"]?.jsonObject
             val orderId = sendStatus?.get("order_id")?.jsonPrimitive?.contentOrNull ?: ""
+            val receivedTime = sendStatus?.get("receivedTime")?.jsonPrimitive?.contentOrNull
+            val timestamp = receivedTime?.let {
+                runCatching { Instant.parse(it).toEpochMilli() }.getOrNull()
+            } ?: System.currentTimeMillis()
+
             logger.info { "Order placed: $orderId for ${cmd.side} ${cmd.qty} @ ${cmd.price}" }
+
+            publishOrderEvent(
+                OrderStateEvent.ExecutionReport.Accepted(
+                    clOrdId = cmd.clOrdId,
+                    orderId = orderId,
+                    side = cmd.side,
+                    price = cmd.price,
+                    qty = cmd.qty,
+                    timestamp = timestamp,
+                ),
+            )
         } else {
             val error = response["error"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
             logger.error { "Order rejected: $error" }

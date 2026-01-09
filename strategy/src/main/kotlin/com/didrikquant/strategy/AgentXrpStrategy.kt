@@ -5,6 +5,7 @@ import com.didrikquant.core.OrderIntent
 import com.didrikquant.core.StrategyAction
 import com.didrikquant.core.roundToTick
 import com.didrikquant.orderstate.OrderSnapshot
+import com.didrikquant.orderstate.OrderState
 import com.didrikquant.orderstate.Side
 import mu.KotlinLogging
 import java.math.BigDecimal
@@ -103,6 +104,11 @@ public class AgentXrpStrategy(
         if (existing == null) {
             logger.debug { "$side: placing $targetPrice x $targetSize" }
             return listOf(StrategyAction.Place(OrderIntent(side, targetPrice, targetSize)))
+        }
+
+        if (existing.state == OrderState.PENDING_NEW) {
+            logger.debug { "$side: holding - order pending exchange confirmation" }
+            return emptyList()
         }
 
         if (isOrderCrossed(existing, mid)) {
