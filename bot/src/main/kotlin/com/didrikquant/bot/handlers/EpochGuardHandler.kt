@@ -1,8 +1,8 @@
 package com.didrikquant.bot.handlers
 
 import com.didrikquant.core.BotFatalException
-import com.didrikquant.core.Event
 import com.didrikquant.core.disruptor.MutableEvent
+import com.didrikquant.orderstate.OrderStateEvent
 import com.lmax.disruptor.EventHandler
 import mu.KotlinLogging
 import java.util.concurrent.atomic.AtomicInteger
@@ -21,8 +21,8 @@ public class EpochGuardHandler(
         sequence: Long,
         endOfBatch: Boolean,
     ) {
-        // Count fills
-        if (event.event is Event.OrderFill) {
+        // Count fills from OrderStateEvent.ExecutionReport.Trade
+        if (event.orderEvent is OrderStateEvent.ExecutionReport.Trade) {
             val count = fillCount.incrementAndGet()
             logger.debug { "Fill count: $count / ${targetTradeCount ?: "unlimited"}" }
 

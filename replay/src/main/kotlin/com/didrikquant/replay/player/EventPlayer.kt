@@ -77,8 +77,6 @@ public class EventPlayer(
         val symbol = when (event) {
             is Event.BookSnapshot -> event.symbol
             is Event.BookUpdate -> event.symbol
-            is Event.OrderAccepted -> event.symbol
-            is Event.OrderFill -> event.symbol
             else -> return true
         }
         return config.matchesSymbol(symbol)

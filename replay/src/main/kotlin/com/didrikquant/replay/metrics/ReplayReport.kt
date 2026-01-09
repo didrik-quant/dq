@@ -14,10 +14,8 @@ public data class ReplayReport(
     val lastEventTimestamp: Long,
     val bookSnapshotCount: Long,
     val bookUpdateCount: Long,
-    val orderAcceptedCount: Int,
-    val orderFillCount: Int,
-    val orderCanceledCount: Int,
-    val orderRejectedCount: Int,
+    val connectCount: Long,
+    val disconnectCount: Long,
     val position: String,
     val realizedPnL: String,
     val unrealizedPnL: String,
@@ -43,10 +41,8 @@ public data class ReplayReport(
             lastEventTimestamp = replayStats.lastEventTimestamp,
             bookSnapshotCount = metrics.bookSnapshotCount,
             bookUpdateCount = metrics.bookUpdateCount,
-            orderAcceptedCount = metrics.orderAcceptedCount,
-            orderFillCount = metrics.orderFillCount,
-            orderCanceledCount = metrics.orderCanceledCount,
-            orderRejectedCount = metrics.orderRejectedCount,
+            connectCount = metrics.connectCount,
+            disconnectCount = metrics.disconnectCount,
             position = pnl.position.toPlainString(),
             realizedPnL = pnl.realizedPnL.toPlainString(),
             unrealizedPnL = pnl.unrealizedPnL.toPlainString(),
@@ -65,7 +61,7 @@ public data class ReplayReport(
         appendLine("=== Replay Report ===")
         appendLine("Events: $eventCount in ${elapsedMs}ms ($eventsPerSecond/sec)")
         appendLine("Book Updates: $bookUpdateCount (snapshots: $bookSnapshotCount)")
-        appendLine("Orders: accepted=$orderAcceptedCount, filled=$orderFillCount, canceled=$orderCanceledCount")
+        appendLine("Connections: $connectCount (disconnects: $disconnectCount)")
         appendLine()
         appendLine("=== P&L ===")
         appendLine("Position: $position")
