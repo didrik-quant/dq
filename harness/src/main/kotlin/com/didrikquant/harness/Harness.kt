@@ -284,6 +284,9 @@ public class Harness(private val config: HarnessConfig) {
             process.inputStream.bufferedReader().forEachLine { line ->
                 logger.info { "[BOT] $line" }
                 outputCapture.appendLine(line)
+                logWriter.write(line)
+                logWriter.newLine()
+                logWriter.flush()
             }
         }.apply {
             isDaemon = true
