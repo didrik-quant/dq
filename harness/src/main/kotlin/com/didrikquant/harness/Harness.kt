@@ -287,7 +287,7 @@ public class Harness(private val config: HarnessConfig) {
 
         val outputThread = Thread {
             process.inputStream.bufferedReader().forEachLine { line ->
-                logger.info { "[BOT] $line" }
+                println(line)
                 outputCapture.appendLine(line)
                 logWriter.write(line)
                 logWriter.newLine()
@@ -303,7 +303,7 @@ public class Harness(private val config: HarnessConfig) {
         val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
 
         if (!completed) {
-            logger.warn { "Bot did not exit within timeout, killing process" }
+            logger.error { "Bot did not exit within timeout, killing process" }
             process.destroyForcibly()
             process.waitFor(10, TimeUnit.SECONDS)
         }

@@ -20,7 +20,8 @@ public class BookHandler(
             is Event.BookSnapshot -> {
                 orderBook.applySnapshot(e.bids, e.asks, sequence)
                 event.orderBookSnapshot = orderBook.snapshot()
-                logger.debug { "Book snapshot: ${event.orderBookSnapshot}" }
+                val snap = event.orderBookSnapshot
+                logger.debug { "Book: bid=${snap?.bestBid} ask=${snap?.bestAsk} spread=${snap?.spreadBps}bps" }
             }
             is Event.BookUpdate -> {
                 orderBook.applyUpdate(e.bids, e.asks, sequence)
