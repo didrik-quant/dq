@@ -60,3 +60,19 @@ Always use superpowers skills when:
 - **Implementing features** - use brainstorming, writing-plans, test-driven-development
 - **Debugging** - use systematic-debugging before proposing fixes
 - **Brainstorming** - use brainstorming skill before any creative or design work
+
+### Mandatory Workflow for Implementation
+
+1. **Brainstorm first** - Refine ideas through questions, explore alternatives, validate design in sections
+2. **Create worktree** - Use `superpowers:using-git-worktrees` BEFORE writing any code
+3. **Write plan** - Use `superpowers:writing-plans` to create detailed implementation plan in `docs/plans/`
+4. **Execute with subagents** - Use `superpowers:subagent-driven-development` for task-by-task execution with two-stage review
+5. **Verify before completion** - Use `superpowers:verification-before-completion` before claiming work is done
+6. **Finish branch** - Use `superpowers:finishing-a-development-branch` for merge/PR decision
+
+### Critical Rules
+
+- **NEVER implement directly on main** - Always use a worktree/feature branch
+- **NEVER skip the worktree step** - Even for "small" changes
+- **Plans go in `docs/plans/YYYY-MM-DD-<topic>.md`**
+- **Verify tests pass BEFORE and AFTER changes**
