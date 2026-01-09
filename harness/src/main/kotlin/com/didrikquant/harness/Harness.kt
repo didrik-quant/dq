@@ -305,6 +305,9 @@ public class Harness(private val config: HarnessConfig) {
 
         outputThread.join(2000)
 
+        logWriter.close()
+        logger.info { "Bot log written to $logFile" }
+
         val exitCode = process.exitValue()
         logger.info { "Bot exited with code: $exitCode" }
 
