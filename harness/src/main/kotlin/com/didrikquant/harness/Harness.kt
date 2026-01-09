@@ -13,7 +13,7 @@ public class Harness(private val config: HarnessConfig) {
 
     private val worktreeManager = WorktreeManager(config.repoRoot)
     private val evolutionLog = EvolutionLog(config.evolutionLogPath)
-    private val opencodeClient = OpencodeClient(config.opencodeHost, config.opencodePort, config.opencodeModel)
+    private val claudeClient = ClaudeCodeClient()
 
     public fun run() {
         logger.info { "Starting harness for ${config.instrument}" }
@@ -21,16 +21,8 @@ public class Harness(private val config: HarnessConfig) {
         logger.info { "Epoch trades: ${config.epochTradeCount}" }
         logger.info { "Epoch max duration: ${config.epochMaxDurationMs}ms (safety timeout)" }
         logger.info { "Repo root: ${config.repoRoot}" }
-        logger.info { "Opencode server: ${config.opencodeHost}:${config.opencodePort}" }
-        logger.info { "Opencode model: ${config.opencodeModel}" }
 
         Files.createDirectories(config.agentDir)
-
-        if (!opencodeClient.healthCheck()) {
-            error(
-                "Cannot connect to opencode server at ${config.opencodeHost}:${config.opencodePort}. Start it with: opencode serve --port ${config.opencodePort}"
-            )
-        }
 
         while (true) {
             runEpoch()
@@ -87,18 +79,9 @@ public class Harness(private val config: HarnessConfig) {
 
     private fun spawnAgent(worktreePath: Path, epoch: Int) {
         val prompt = buildAgentPrompt(worktreePath, epoch)
-
-        logger.info { "Sending prompt to opencode server" }
-
-        val sessionId = opencodeClient.createSession()
-        logger.info { "Created opencode session: $sessionId" }
-
-        try {
-            opencodeClient.sendPrompt(sessionId, prompt)
-        } finally {
-            opencodeClient.deleteSession(sessionId)
-            logger.info { "Deleted opencode session: $sessionId" }
-        }
+        logger.info { "Spawning Claude Code agent in $worktreePath" }
+        claudeClient.runPrompt(worktreePath, prompt)
+        logger.info { "Agent completed" }
     }
 
     private fun buildAgentPrompt(worktreePath: Path, epoch: Int): String {

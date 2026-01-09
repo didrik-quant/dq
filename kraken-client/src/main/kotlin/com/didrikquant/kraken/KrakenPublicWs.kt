@@ -36,6 +36,7 @@ public class KrakenPublicWs(
 
     @Volatile
     private var ready: Boolean = false
+
     @Volatile
     private var shutdown: Boolean = false
 
