@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package com.didrikquant.orderstate
 
 import io.kotest.core.spec.style.FunSpec
@@ -52,7 +54,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val acceptResult = snapshot.apply(accepted)
         acceptResult.shouldBeInstanceOf<TransitionResult.Success>()
-        snapshot = (acceptResult as TransitionResult.Success).snapshot
+        snapshot = acceptResult.snapshot
 
         snapshot.state shouldBe OrderState.OPEN
         snapshot.orderId shouldBe "exchange-order-123"
@@ -68,7 +70,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val partialResult = snapshot.apply(trade1)
         partialResult.shouldBeInstanceOf<TransitionResult.Success>()
-        snapshot = (partialResult as TransitionResult.Success).snapshot
+        snapshot = partialResult.snapshot
 
         snapshot.state shouldBe OrderState.PARTIALLY_FILLED
         snapshot.filledQty shouldBe BigDecimal("3.00")
@@ -86,7 +88,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val filledResult = snapshot.apply(trade2)
         filledResult.shouldBeInstanceOf<TransitionResult.Success>()
-        snapshot = (filledResult as TransitionResult.Success).snapshot
+        snapshot = filledResult.snapshot
 
         snapshot.state shouldBe OrderState.FILLED
         snapshot.filledQty shouldBe BigDecimal("10.00")
@@ -111,7 +113,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val result = snapshot.apply(rejected)
         result.shouldBeInstanceOf<TransitionResult.Success>()
-        snapshot = (result as TransitionResult.Success).snapshot
+        snapshot = result.snapshot
 
         snapshot.state shouldBe OrderState.REJECTED
         snapshot.isTerminal shouldBe true
@@ -159,7 +161,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val result = snapshot.apply(canceled)
         result.shouldBeInstanceOf<TransitionResult.Success>()
-        snapshot = (result as TransitionResult.Success).snapshot
+        snapshot = result.snapshot
 
         snapshot.state shouldBe OrderState.CANCELED
         snapshot.isTerminal shouldBe true
@@ -247,7 +249,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
 
         val result = snapshot.apply(wrongEvent)
         result.shouldBeInstanceOf<TransitionResult.Invalid>()
-        (result as TransitionResult.Invalid).reason shouldBe
+        result.reason shouldBe
             "Event clOrdId 'wrong-order' doesn't match order 'order-005'"
     }
 
@@ -273,7 +275,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
 
         val result = snapshot.apply(trade)
         result.shouldBeInstanceOf<TransitionResult.Success>()
-        val filled = (result as TransitionResult.Success).snapshot
+        val filled = result.snapshot
         filled.state shouldBe OrderState.FILLED
         filled.filledQty shouldBe BigDecimal("5.00")
     }
@@ -307,7 +309,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
 
         val result = snapshot.apply(accepted)
-        result.shouldBeInstanceOf<TransitionResult.Invalid>()
+        result.shouldBeInstanceOf<TransitionResult.UnchangedTerminal>()
     }
 
     test("cannot reject after accepted") {
@@ -362,7 +364,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
 
         val result = snapshot.apply(cancelInstruction)
         result.shouldBeInstanceOf<TransitionResult.Unchanged>()
-        (result as TransitionResult.Unchanged).snapshot shouldBe snapshot
+        result.snapshot shouldBe snapshot
     }
 
     // ============================================================
@@ -563,7 +565,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val result1 = snapshot.apply(trade1)
         result1.shouldBeInstanceOf<TransitionResult.Success>()
-        snapshot = (result1 as TransitionResult.Success).snapshot
+        snapshot = result1.snapshot
         snapshot.filledQty shouldBe BigDecimal("5.00")
 
         // Duplicate fill with same execId - should be rejected
@@ -600,7 +602,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val result = snapshot.apply(pendingNew)
         result.shouldBeInstanceOf<TransitionResult.Success>()
-        snapshot = (result as TransitionResult.Success).snapshot
+        snapshot = result.snapshot
 
         // Should still be PENDING_NEW but with orderId set
         snapshot.state shouldBe OrderState.PENDING_NEW
@@ -638,7 +640,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val result = snapshot.apply(amended)
         result.shouldBeInstanceOf<TransitionResult.Success>()
-        snapshot = (result as TransitionResult.Success).snapshot
+        snapshot = result.snapshot
 
         snapshot.currentPrice shouldBe BigDecimal("100.00") // Price unchanged
         snapshot.currentQty shouldBe BigDecimal("5.00") // Qty changed
@@ -684,7 +686,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val result = snapshot.apply(expired)
         result.shouldBeInstanceOf<TransitionResult.Success>()
-        snapshot = (result as TransitionResult.Success).snapshot
+        snapshot = result.snapshot
 
         snapshot.state shouldBe OrderState.EXPIRED
         snapshot.isTerminal shouldBe true

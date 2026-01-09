@@ -1,5 +1,6 @@
 package com.didrikquant.execution
 
+import com.didrikquant.execution.ApplyResult.*
 import com.didrikquant.orderstate.OrderSnapshot
 import com.didrikquant.orderstate.OrderStateEvent
 import com.didrikquant.orderstate.TransitionResult
@@ -19,25 +20,33 @@ public class OrderStore {
 
     public fun apply(event: OrderStateEvent): ApplyResult {
         val clOrdId = event.clOrdId
-        val before = orders[clOrdId] ?: return ApplyResult.OrderNotFound(clOrdId)
+        val before = orders[clOrdId] ?: return OrderNotFound(clOrdId)
 
         return when (val result = before.apply(event)) {
             is TransitionResult.Success -> {
                 orders[clOrdId] = result.snapshot
-                ApplyResult.Success(before, result.snapshot)
+                Success(before, result.snapshot)
             }
+
             is TransitionResult.SuccessWithWarning -> {
                 orders[clOrdId] = result.snapshot
-                ApplyResult.SuccessWithWarning(before, result.snapshot, result.warning)
+                SuccessWithWarning(before, result.snapshot, result.warning)
             }
+
             is TransitionResult.Unchanged -> {
-                ApplyResult.Success(before, before)
+                Success(before, before)
             }
+
             is TransitionResult.Duplicate -> {
-                ApplyResult.DuplicateExecution(before, result.execId)
+                DuplicateExecution(before, result.execId)
             }
+
             is TransitionResult.Invalid -> {
-                ApplyResult.InvalidTransition(before, result.reason)
+                InvalidTransition(before, result.reason)
+            }
+
+            is TransitionResult.UnchangedTerminal -> {
+                Success(before, before)
             }
         }
     }

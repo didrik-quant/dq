@@ -53,17 +53,23 @@ public class TradingHandler(
         val orderEvent = event.orderEvent as? OrderStateEvent.ExecutionReport ?: return
 
         when (val result = orderStore.apply(orderEvent)) {
-            is ApplyResult.Success -> handleSuccessfulOrderEvent(orderEvent)
+            is ApplyResult.Success -> {
+                handleSuccessfulOrderEvent(orderEvent)
+            }
+
             is ApplyResult.SuccessWithWarning -> {
                 logger.warn { "Order event warning: ${result.warning}" }
                 handleSuccessfulOrderEvent(orderEvent)
             }
+
             is ApplyResult.DuplicateExecution -> {
                 logger.debug { "Duplicate execution: ${result.execId}" }
             }
+
             is ApplyResult.OrderNotFound -> {
                 throw BotFatalException("Order not found: ${result.clOrdId}")
             }
+
             is ApplyResult.InvalidTransition -> {
                 throw BotFatalException("Invalid order transition: ${result.reason}")
             }
@@ -81,18 +87,23 @@ public class TradingHandler(
                         "position=${positionTracker.getPosition()}, pnl=${positionTracker.getRealizedPnl()}"
                 }
             }
+
             is OrderStateEvent.ExecutionReport.Accepted -> {
                 logger.info { "Order accepted: ${orderEvent.orderId} (${orderEvent.clOrdId})" }
             }
+
             is OrderStateEvent.ExecutionReport.Canceled -> {
                 logger.info { "Order canceled: ${orderEvent.orderId} - ${orderEvent.reason}" }
             }
+
             is OrderStateEvent.ExecutionReport.Amended -> {
                 logger.info { "Order amended: ${orderEvent.previousOrderId} -> ${orderEvent.orderId}" }
             }
+
             is OrderStateEvent.ExecutionReport.Rejected -> {
                 throw BotFatalException("Order rejected: ${orderEvent.clOrdId} - ${orderEvent.reason}")
             }
+
             else -> {}
         }
     }
@@ -133,6 +144,7 @@ public class TradingHandler(
                     logger.debug { "Strategy generated ${actions.size} actions at ${bookSnapshot.midPrice}" }
                 }
             }
+
             else -> {}
         }
     }
@@ -154,7 +166,7 @@ public class TradingHandler(
                                 qty = intent.qty,
                                 timestamp = System.currentTimeMillis(),
                             )
-                            when (val createResult = orderStore.create(createInstruction)) {
+                            when (orderStore.create(createInstruction)) {
                                 is CreateResult.Created -> {
                                     commands.add(
                                         Command.PlaceOrder(
@@ -168,16 +180,19 @@ public class TradingHandler(
                                     )
                                     logger.info { "Place: ${intent.side} ${intent.qty} @ ${intent.price}" }
                                 }
+
                                 is CreateResult.DuplicateClOrdId -> {
                                     logger.error { "Duplicate clOrdId: $clOrdId" }
                                 }
                             }
                         }
+
                         is RiskCheckResult.Rejected -> {
                             throw BotFatalException("RISK BREACH: ${result.reason}")
                         }
                     }
                 }
+
                 is StrategyAction.Amend -> {
                     commands.add(
                         Command.AmendOrder(
@@ -188,6 +203,7 @@ public class TradingHandler(
                     )
                     logger.info { "Amend: ${action.clOrdId} -> ${action.newPrice}" }
                 }
+
                 is StrategyAction.Cancel -> {
                     commands.add(Command.CancelOrder(clOrdId = action.clOrdId))
                     logger.info { "Cancel: ${action.clOrdId}" }

@@ -107,20 +107,26 @@ public class Pipeline(
     private companion object {
         fun createStrategy(config: BotConfig): Strategy =
             when (config.strategyClass) {
-                "SimpleMarketMaker" ->
+                "SimpleMarketMaker" -> {
                     SimpleMarketMaker(
                         spreadBps = config.spreadBps,
                         orderSize = config.orderSize,
                         tickSize = config.tickSize,
                         maxPosition = config.maxPosition,
                     )
-                "AgentXrpStrategy" ->
+                }
+
+                "AgentXrpStrategy" -> {
                     AgentXrpStrategy(
                         orderSize = config.orderSize,
                         tickSize = config.tickSize,
                         maxPosition = config.maxPosition,
                     )
-                else -> error("Unknown strategy class: ${config.strategyClass}")
+                }
+
+                else -> {
+                    error("Unknown strategy class: ${config.strategyClass}")
+                }
             }
     }
 }

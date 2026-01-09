@@ -45,12 +45,15 @@ public class DryRunOutputHandler : CommandOutputHandler {
                             "(${distanceFromMid}bps from mid, postOnly=${cmd.postOnly})"
                     }
                 }
+
                 is Command.CancelOrder -> {
                     logger.info { "[DRY-RUN] Would cancel: ${cmd.clOrdId}" }
                 }
+
                 is Command.CancelAll -> {
                     logger.info { "[DRY-RUN] Would cancel all orders for ${cmd.symbol ?: "all symbols"}" }
                 }
+
                 is Command.AmendOrder -> {
                     logger.info { "[DRY-RUN] Would amend: ${cmd.clOrdId} -> ${cmd.newPrice}" }
                 }

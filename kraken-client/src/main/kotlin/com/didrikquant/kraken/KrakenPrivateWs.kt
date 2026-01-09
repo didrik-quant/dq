@@ -51,7 +51,7 @@ public class KrakenPrivateWs(
 
     public fun isReady(): Boolean = ready
 
-    public suspend fun connect(scope: CoroutineScope) {
+    public fun connect(scope: CoroutineScope) {
         job = scope.launch {
             while (isActive) {
                 try {
@@ -192,7 +192,11 @@ public class KrakenPrivateWs(
                     logger.trace { "Private WS received: $text" }
                     processMessage(text)
                 }
-                is Frame.Ping -> send(Frame.Pong(frame.data))
+
+                is Frame.Ping -> {
+                    send(Frame.Pong(frame.data))
+                }
+
                 else -> {}
             }
         }
@@ -320,7 +324,10 @@ public class KrakenPrivateWs(
 
             val feed = obj["feed"]?.jsonPrimitive?.contentOrNull
             when (feed) {
-                "fills" -> processFills(obj)
+                "fills" -> {
+                    processFills(obj)
+                }
+
                 "fills_snapshot" -> {
                     // Don't publish historical fills - they would incorrectly count towards epoch targets
                     val fills = obj["fills"]?.jsonArray
@@ -328,8 +335,15 @@ public class KrakenPrivateWs(
                         "Received fills_snapshot with ${fills?.size ?: 0} historical fills (not counting towards epoch)"
                     }
                 }
-                "open_orders", "open_orders_snapshot" -> processOpenOrders(obj)
-                "open_positions", "open_positions_snapshot" -> processPositions(obj)
+
+                "open_orders", "open_orders_snapshot" -> {
+                    processOpenOrders(obj)
+                }
+
+                "open_positions", "open_positions_snapshot" -> {
+                    processPositions(obj)
+                }
+
                 "heartbeat" -> {}
             }
 

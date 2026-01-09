@@ -221,8 +221,14 @@ internal object OrderStateArbs {
         val originalQty = create.qty
         val maxFilled = originalQty.toDouble() * 0.99
         val filledQty = when (state) {
-            OrderState.PENDING_NEW, OrderState.REJECTED -> BigDecimal.ZERO
-            OrderState.OPEN -> BigDecimal.ZERO
+            OrderState.PENDING_NEW, OrderState.REJECTED -> {
+                BigDecimal.ZERO
+            }
+
+            OrderState.OPEN -> {
+                BigDecimal.ZERO
+            }
+
             OrderState.PARTIALLY_FILLED -> {
                 if (maxFilled > 0.0001) {
                     Arb.double(0.0001..maxFilled)
@@ -233,7 +239,11 @@ internal object OrderStateArbs {
                     BigDecimal("0.0001")
                 }
             }
-            OrderState.FILLED -> originalQty
+
+            OrderState.FILLED -> {
+                originalQty
+            }
+
             OrderState.CANCELED, OrderState.EXPIRED -> {
                 val maxCanceled = originalQty.toDouble() * 0.5
                 if (maxCanceled > 0.0001) {
@@ -263,10 +273,6 @@ internal object OrderStateArbs {
     }
 
     internal fun snapshotInTerminalState(): Arb<OrderSnapshot> = snapshot().filter { it.state.isTerminal() }
-
-    internal fun snapshotInActiveState(): Arb<OrderSnapshot> = snapshot().filter { it.state.isActive() }
-
-    internal fun snapshotInPendingNew(): Arb<OrderSnapshot> = snapshot().filter { it.state == OrderState.PENDING_NEW }
 
     // ============================================================
     // VALID SEQUENCE GENERATORS
@@ -300,6 +306,7 @@ internal object OrderStateArbs {
                     ),
                 )
             }
+
             1 -> {
                 // Accepted then canceled
                 events.add(
@@ -322,6 +329,7 @@ internal object OrderStateArbs {
                     ),
                 )
             }
+
             2 -> {
                 // Accepted then filled immediately
                 events.add(
@@ -347,6 +355,7 @@ internal object OrderStateArbs {
                     ),
                 )
             }
+
             3 -> {
                 // Accepted, partial fills, then filled
                 events.add(
@@ -392,6 +401,7 @@ internal object OrderStateArbs {
                     ),
                 )
             }
+
             4 -> {
                 // Accepted then expired
                 events.add(
@@ -407,6 +417,7 @@ internal object OrderStateArbs {
                 ts += Arb.long(1L..1000L).bind()
                 events.add(OrderStateEvent.ExecutionReport.Expired(clOrdId, orderId, ts))
             }
+
             5 -> {
                 // Accepted, amended, then filled
                 events.add(

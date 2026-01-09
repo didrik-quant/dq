@@ -37,7 +37,7 @@ public data class OrderSnapshot(
         }
 
         if (state.isTerminal()) {
-            return TransitionResult.Invalid("Order is in terminal state $state, cannot apply $event")
+            return TransitionResult.UnchangedTerminal(this, event)
         }
 
         return when (event) {
@@ -93,7 +93,7 @@ public data class OrderSnapshot(
 
         return TransitionResult.Success(
             copy(
-                orderId = if (orderId.isEmpty()) event.orderId else orderId,
+                orderId = orderId.ifEmpty { event.orderId },
                 filledQty = newFilledQty,
                 avgFillPrice = calculateNewAvgPrice(event.fillQty, event.fillPrice),
                 state = newState,
@@ -207,6 +207,8 @@ public sealed class TransitionResult {
         val warning: String,
     ) : TransitionResult()
 
+    public data class UnchangedTerminal(val snapshot: OrderSnapshot, val event: OrderStateEvent) : TransitionResult()
+
     public data class Unchanged(val snapshot: OrderSnapshot) : TransitionResult()
 
     public data class Duplicate(val execId: String) : TransitionResult()
@@ -219,6 +221,7 @@ public sealed class TransitionResult {
         is Unchanged -> snapshot
         is Duplicate -> null
         is Invalid -> null
+        is UnchangedTerminal -> snapshot
     }
 
     public fun isOk(): Boolean = when (this) {
@@ -227,5 +230,6 @@ public sealed class TransitionResult {
         is Unchanged -> true
         is Duplicate -> false
         is Invalid -> false
+        is UnchangedTerminal -> true
     }
 }

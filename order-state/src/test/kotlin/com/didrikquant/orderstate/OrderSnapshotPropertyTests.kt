@@ -1,3 +1,5 @@
+@file:Suppress("unused")
+
 package com.didrikquant.orderstate
 
 import io.kotest.core.spec.style.FunSpec
@@ -22,13 +24,13 @@ internal class OrderSnapshotPropertyTests : FunSpec({
     // STATE MACHINE PROPERTIES
     // ============================================================
 
-    test("terminal states reject all execution reports") {
+    test("terminal states stays terminal for all execution reports") {
         checkAll(
             OrderStateArbs.snapshotInTerminalState(),
             OrderStateArbs.executionReport(),
         ) { snapshot, event ->
             val result = snapshot.apply(event.withClOrdId(snapshot.clOrdId))
-            result.shouldBeInstanceOf<TransitionResult.Invalid>()
+            result.shouldBeInstanceOf<TransitionResult.UnchangedTerminal>()
         }
     }
 
@@ -46,8 +48,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
 
     test("successful transitions produce new snapshot instance") {
         checkAll(OrderStateArbs.validTransition()) { (snapshot, event) ->
-            val result = snapshot.apply(event)
-            val newSnapshot = when (result) {
+            val newSnapshot = when (val result = snapshot.apply(event)) {
                 is TransitionResult.Success -> result.snapshot
                 is TransitionResult.SuccessWithWarning -> result.snapshot
                 else -> null
@@ -67,7 +68,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
             if (!snapshot.state.isTerminal()) {
                 val result = snapshot.apply(instruction.withClOrdId(snapshot.clOrdId))
                 result.shouldBeInstanceOf<TransitionResult.Unchanged>()
-                (result as TransitionResult.Unchanged).snapshot shouldBe snapshot
+                result.snapshot shouldBe snapshot
             }
         }
     }
@@ -155,21 +156,26 @@ internal class OrderSnapshotPropertyTests : FunSpec({
                     event.price shouldBeGreaterThan BigDecimal.ZERO
                     event.qty shouldBeGreaterThan BigDecimal.ZERO
                 }
+
                 is OrderStateEvent.Instruction.Amend -> {
                     event.newPrice?.let { it shouldBeGreaterThan BigDecimal.ZERO }
                     event.newQty?.let { it shouldBeGreaterThan BigDecimal.ZERO }
                 }
+
                 is OrderStateEvent.ExecutionReport.Accepted -> {
                     event.price shouldBeGreaterThan BigDecimal.ZERO
                     event.qty shouldBeGreaterThan BigDecimal.ZERO
                 }
+
                 is OrderStateEvent.ExecutionReport.Trade -> {
                     event.fillPrice shouldBeGreaterThan BigDecimal.ZERO
                     event.fillQty shouldBeGreaterThan BigDecimal.ZERO
                 }
+
                 is OrderStateEvent.ExecutionReport.Amended -> {
                     event.newPrice?.let { it shouldBeGreaterThan BigDecimal.ZERO }
                 }
+
                 else -> {}
             }
         }
@@ -357,27 +363,35 @@ internal class OrderSnapshotPropertyTests : FunSpec({
 
     test("TransitionResult.snapshotOrNull returns correct value") {
         checkAll(OrderStateArbs.validTransition()) { (snapshot, event) ->
-            val result = snapshot.apply(event)
-            when (result) {
+            when (val result = snapshot.apply(event)) {
                 is TransitionResult.Success -> {
                     result.snapshotOrNull() shouldBe result.snapshot
                     result.isOk() shouldBe true
                 }
+
                 is TransitionResult.SuccessWithWarning -> {
                     result.snapshotOrNull() shouldBe result.snapshot
                     result.isOk() shouldBe true
                 }
+
                 is TransitionResult.Unchanged -> {
                     result.snapshotOrNull() shouldBe result.snapshot
                     result.isOk() shouldBe true
                 }
+
                 is TransitionResult.Duplicate -> {
                     result.snapshotOrNull() shouldBe null
                     result.isOk() shouldBe false
                 }
+
                 is TransitionResult.Invalid -> {
                     result.snapshotOrNull() shouldBe null
                     result.isOk() shouldBe false
+                }
+
+                is TransitionResult.UnchangedTerminal -> {
+                    result.snapshotOrNull() shouldBe result.snapshot
+                    result.isOk() shouldBe true
                 }
             }
         }
