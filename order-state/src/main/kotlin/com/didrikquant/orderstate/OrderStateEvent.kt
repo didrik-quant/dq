@@ -80,29 +80,6 @@ public sealed class OrderStateEvent {
             override val timestamp: Long,
         ) : ExecutionReport()
 
-        /** Partial fill received (ExecType=Trade, OrdStatus=PartiallyFilled) */
-        public data class PartialFill(
-            override val clOrdId: String,
-            override val orderId: String,
-            val execId: String,
-            val fillQty: BigDecimal,
-            val fillPrice: BigDecimal,
-            val cumQty: BigDecimal,
-            val leavesQty: BigDecimal,
-            override val timestamp: Long,
-        ) : ExecutionReport()
-
-        /** Order fully filled - terminal (ExecType=Trade, OrdStatus=Filled) */
-        public data class Filled(
-            override val clOrdId: String,
-            override val orderId: String,
-            val execId: String,
-            val fillQty: BigDecimal,
-            val fillPrice: BigDecimal,
-            val cumQty: BigDecimal,
-            override val timestamp: Long,
-        ) : ExecutionReport()
-
         /** Order canceled - terminal (ExecType=Canceled) */
         public data class Canceled(
             override val clOrdId: String,

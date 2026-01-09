@@ -129,33 +129,13 @@ internal object OrderStateArbs {
         )
     }
 
-    internal fun executionReportPartialFill(): Arb<OrderStateEvent.ExecutionReport.PartialFill> = arbitrary {
-        val cumQty = qty().bind()
-        val fillQtyValue = Arb.double(0.0001..cumQty.toDouble().coerceAtLeast(0.0002))
-            .filter { it.isFinite() }
-            .map { BigDecimal.valueOf(it).setScale(4, RoundingMode.HALF_UP) }
-            .bind()
-        OrderStateEvent.ExecutionReport.PartialFill(
-            clOrdId = clOrdId().bind(),
-            orderId = orderId().bind(),
-            execId = execId().bind(),
-            fillQty = fillQtyValue,
-            fillPrice = price().bind(),
-            cumQty = cumQty,
-            leavesQty = qty().bind(),
-            timestamp = timestamp().bind(),
-        )
-    }
-
-    internal fun executionReportFilled(): Arb<OrderStateEvent.ExecutionReport.Filled> = arbitrary {
-        val cumQty = qty().bind()
-        OrderStateEvent.ExecutionReport.Filled(
+    internal fun executionReportTrade(): Arb<OrderStateEvent.ExecutionReport.Trade> = arbitrary {
+        OrderStateEvent.ExecutionReport.Trade(
             clOrdId = clOrdId().bind(),
             orderId = orderId().bind(),
             execId = execId().bind(),
             fillQty = qty().bind(),
             fillPrice = price().bind(),
-            cumQty = cumQty,
             timestamp = timestamp().bind(),
         )
     }
@@ -209,16 +189,15 @@ internal object OrderStateArbs {
     }
 
     internal fun executionReport(): Arb<OrderStateEvent.ExecutionReport> = arbitrary {
-        val choice = Arb.int(0..8).bind()
+        val choice = Arb.int(0..7).bind()
         when (choice) {
             0 -> executionReportPendingNew().bind()
             1 -> executionReportAccepted().bind()
-            2 -> executionReportPartialFill().bind()
-            3 -> executionReportFilled().bind()
-            4 -> executionReportCanceled().bind()
-            5 -> executionReportRejected().bind()
-            6 -> executionReportExpired().bind()
-            7 -> executionReportAmended().bind()
+            2 -> executionReportTrade().bind()
+            3 -> executionReportCanceled().bind()
+            4 -> executionReportRejected().bind()
+            5 -> executionReportExpired().bind()
+            6 -> executionReportAmended().bind()
             else -> executionReportRestated().bind()
         }
     }
@@ -358,13 +337,12 @@ internal object OrderStateArbs {
                 ts += Arb.long(1L..1000L).bind()
                 val fillPrice = price().bind()
                 events.add(
-                    OrderStateEvent.ExecutionReport.Filled(
+                    OrderStateEvent.ExecutionReport.Trade(
                         clOrdId,
                         orderId,
                         execId().bind(),
                         originalQty,
                         fillPrice,
-                        originalQty,
                         ts,
                     ),
                 )
@@ -389,16 +367,13 @@ internal object OrderStateArbs {
                 repeat(numFills) {
                     ts += Arb.long(1L..1000L).bind()
                     cumQty += fillQty
-                    val leavesQty = originalQty - cumQty
                     events.add(
-                        OrderStateEvent.ExecutionReport.PartialFill(
+                        OrderStateEvent.ExecutionReport.Trade(
                             clOrdId,
                             orderId,
                             execId().bind(),
                             fillQty,
                             price().bind(),
-                            cumQty,
-                            leavesQty,
                             ts,
                         ),
                     )
@@ -407,13 +382,12 @@ internal object OrderStateArbs {
                 ts += Arb.long(1L..1000L).bind()
                 val lastFill = originalQty - cumQty
                 events.add(
-                    OrderStateEvent.ExecutionReport.Filled(
+                    OrderStateEvent.ExecutionReport.Trade(
                         clOrdId,
                         orderId,
                         execId().bind(),
                         lastFill,
                         price().bind(),
-                        originalQty,
                         ts,
                     ),
                 )
@@ -460,13 +434,12 @@ internal object OrderStateArbs {
                 )
                 ts += Arb.long(1L..1000L).bind()
                 events.add(
-                    OrderStateEvent.ExecutionReport.Filled(
+                    OrderStateEvent.ExecutionReport.Trade(
                         clOrdId,
                         newOrderId,
                         execId().bind(),
                         originalQty,
                         newPrice,
-                        originalQty,
                         ts,
                     ),
                 )
@@ -478,15 +451,12 @@ internal object OrderStateArbs {
 
     internal fun validEventSequenceWithFills(): Arb<List<OrderStateEvent>> =
         validEventSequence().filter { events ->
-            events.any {
-                it is OrderStateEvent.ExecutionReport.PartialFill ||
-                    it is OrderStateEvent.ExecutionReport.Filled
-            }
+            events.any { it is OrderStateEvent.ExecutionReport.Trade }
         }
 
     internal fun validEventSequenceEndingInFilled(): Arb<List<OrderStateEvent>> =
         validEventSequence().filter { events ->
-            events.lastOrNull() is OrderStateEvent.ExecutionReport.Filled
+            events.lastOrNull() is OrderStateEvent.ExecutionReport.Trade
         }
 
     internal fun validTransition(): Arb<Pair<OrderSnapshot, OrderStateEvent>> = arbitrary {
@@ -529,8 +499,6 @@ internal fun OrderStateEvent.withClOrdId(newClOrdId: String): OrderStateEvent = 
     is OrderStateEvent.ExecutionReport.PendingNew -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.Accepted -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.Trade -> copy(clOrdId = newClOrdId)
-    is OrderStateEvent.ExecutionReport.PartialFill -> copy(clOrdId = newClOrdId)
-    is OrderStateEvent.ExecutionReport.Filled -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.Canceled -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.Rejected -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.Expired -> copy(clOrdId = newClOrdId)

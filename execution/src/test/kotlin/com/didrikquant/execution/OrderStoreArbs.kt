@@ -96,38 +96,17 @@ internal object OrderStoreArbs {
         )
     }
 
-    internal fun partialFillEvent(
+    internal fun tradeEvent(
         clOrdId: String,
         orderId: String,
         fillQty: BigDecimal,
-        cumQty: BigDecimal,
-        leavesQty: BigDecimal,
-    ): Arb<OrderStateEvent.ExecutionReport.PartialFill> = arbitrary {
-        OrderStateEvent.ExecutionReport.PartialFill(
+    ): Arb<OrderStateEvent.ExecutionReport.Trade> = arbitrary {
+        OrderStateEvent.ExecutionReport.Trade(
             clOrdId = clOrdId,
             orderId = orderId,
             execId = execId().bind(),
             fillQty = fillQty,
             fillPrice = price().bind(),
-            cumQty = cumQty,
-            leavesQty = leavesQty,
-            timestamp = timestamp().bind(),
-        )
-    }
-
-    internal fun filledEvent(
-        clOrdId: String,
-        orderId: String,
-        fillQty: BigDecimal,
-        cumQty: BigDecimal,
-    ): Arb<OrderStateEvent.ExecutionReport.Filled> = arbitrary {
-        OrderStateEvent.ExecutionReport.Filled(
-            clOrdId = clOrdId,
-            orderId = orderId,
-            execId = execId().bind(),
-            fillQty = fillQty,
-            fillPrice = price().bind(),
-            cumQty = cumQty,
             timestamp = timestamp().bind(),
         )
     }
@@ -210,16 +189,16 @@ internal object OrderStoreArbs {
                 events.add(accepted)
                 ts += Arb.long(1L..1000L).bind()
 
-                val filled = OrderStateEvent.ExecutionReport.Filled(
+                // Single trade that fills entire order
+                val trade = OrderStateEvent.ExecutionReport.Trade(
                     clOrdId = create.clOrdId,
                     orderId = orderId,
                     execId = execId().bind(),
                     fillQty = create.qty,
                     fillPrice = price().bind(),
-                    cumQty = create.qty,
                     timestamp = ts,
                 )
-                events.add(filled)
+                events.add(trade)
                 OrderLifecycle(create, events, OrderState.FILLED)
             }
             3 -> {
@@ -235,31 +214,30 @@ internal object OrderStoreArbs {
                 events.add(accepted)
                 ts += Arb.long(1L..1000L).bind()
 
+                // First trade - partial fill
                 val fillQty = create.qty.divide(BigDecimal(2), 8, RoundingMode.DOWN)
-                val partial = OrderStateEvent.ExecutionReport.PartialFill(
+                val trade1 = OrderStateEvent.ExecutionReport.Trade(
                     clOrdId = create.clOrdId,
                     orderId = orderId,
                     execId = execId().bind(),
                     fillQty = fillQty,
                     fillPrice = price().bind(),
-                    cumQty = fillQty,
-                    leavesQty = create.qty - fillQty,
                     timestamp = ts,
                 )
-                events.add(partial)
+                events.add(trade1)
                 ts += Arb.long(1L..1000L).bind()
 
+                // Second trade - completes the order
                 val remaining = create.qty - fillQty
-                val filled = OrderStateEvent.ExecutionReport.Filled(
+                val trade2 = OrderStateEvent.ExecutionReport.Trade(
                     clOrdId = create.clOrdId,
                     orderId = orderId,
                     execId = execId().bind(),
                     fillQty = remaining,
                     fillPrice = price().bind(),
-                    cumQty = create.qty,
                     timestamp = ts,
                 )
-                events.add(filled)
+                events.add(trade2)
                 OrderLifecycle(create, events, OrderState.FILLED)
             }
             else -> {

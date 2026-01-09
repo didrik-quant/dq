@@ -44,8 +44,6 @@ public data class OrderSnapshot(
             is OrderStateEvent.ExecutionReport.PendingNew -> applyPendingNew(event)
             is OrderStateEvent.ExecutionReport.Accepted -> applyAccepted(event)
             is OrderStateEvent.ExecutionReport.Trade -> applyTrade(event)
-            is OrderStateEvent.ExecutionReport.PartialFill -> applyPartialFill(event)
-            is OrderStateEvent.ExecutionReport.Filled -> applyFilled(event)
             is OrderStateEvent.ExecutionReport.Canceled -> applyCanceled(event)
             is OrderStateEvent.ExecutionReport.Rejected -> applyRejected(event)
             is OrderStateEvent.ExecutionReport.Expired -> applyExpired(event)
@@ -78,66 +76,6 @@ public data class OrderSnapshot(
                 lastUpdateTimestamp = event.timestamp,
             ),
         )
-    }
-
-    private fun applyPartialFill(event: OrderStateEvent.ExecutionReport.PartialFill): TransitionResult {
-        if (state !in OrderState.FILLABLE_STATES) {
-            return TransitionResult.Invalid("Cannot apply PartialFill in state $state")
-        }
-
-        if (event.execId in appliedExecIds) {
-            return TransitionResult.Duplicate(event.execId)
-        }
-
-        if (event.cumQty > currentQty) {
-            return TransitionResult.Invalid("CumQty ${event.cumQty} exceeds currentQty $currentQty")
-        }
-
-        val expectedCumQty = filledQty + event.fillQty
-        val newSnapshot = copy(
-            filledQty = event.cumQty,
-            avgFillPrice = calculateNewAvgPrice(event.fillQty, event.fillPrice),
-            state = OrderState.PARTIALLY_FILLED,
-            lastUpdateTimestamp = event.timestamp,
-            appliedExecIds = appliedExecIds + event.execId,
-        )
-
-        return if (event.cumQty.compareTo(expectedCumQty) != 0) {
-            TransitionResult.SuccessWithWarning(
-                newSnapshot,
-                "cumQty mismatch: expected $expectedCumQty but got ${event.cumQty}",
-            )
-        } else {
-            TransitionResult.Success(newSnapshot)
-        }
-    }
-
-    private fun applyFilled(event: OrderStateEvent.ExecutionReport.Filled): TransitionResult {
-        if (state !in OrderState.FILLABLE_STATES) {
-            return TransitionResult.Invalid("Cannot apply Filled in state $state")
-        }
-
-        if (event.execId in appliedExecIds) {
-            return TransitionResult.Duplicate(event.execId)
-        }
-
-        val expectedCumQty = filledQty + event.fillQty
-        val newSnapshot = copy(
-            filledQty = event.cumQty,
-            avgFillPrice = calculateNewAvgPrice(event.fillQty, event.fillPrice),
-            state = OrderState.FILLED,
-            lastUpdateTimestamp = event.timestamp,
-            appliedExecIds = appliedExecIds + event.execId,
-        )
-
-        return if (event.cumQty.compareTo(expectedCumQty) != 0) {
-            TransitionResult.SuccessWithWarning(
-                newSnapshot,
-                "cumQty mismatch: expected $expectedCumQty but got ${event.cumQty}",
-            )
-        } else {
-            TransitionResult.Success(newSnapshot)
-        }
     }
 
     private fun applyTrade(event: OrderStateEvent.ExecutionReport.Trade): TransitionResult {
