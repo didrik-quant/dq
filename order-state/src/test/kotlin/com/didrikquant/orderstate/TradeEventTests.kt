@@ -5,6 +5,13 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import java.math.BigDecimal
 
+/** Helper to compare BigDecimals numerically (ignoring scale) */
+private infix fun BigDecimal.shouldBeNumerically(expected: BigDecimal) {
+    if (this.compareTo(expected) != 0) {
+        throw AssertionError("expected:<$expected> but was:<$this>")
+    }
+}
+
 internal class TradeEventTests : FunSpec({
 
     test("Trade event transitions OPEN order to PARTIALLY_FILLED") {
@@ -79,7 +86,7 @@ internal class TradeEventTests : FunSpec({
 
         snapshot.state shouldBe OrderState.FILLED
         snapshot.filledQty shouldBe BigDecimal("5.00")
-        snapshot.remainingQty shouldBe BigDecimal.ZERO
+        snapshot.remainingQty shouldBeNumerically BigDecimal.ZERO
         snapshot.isTerminal shouldBe true
     }
 

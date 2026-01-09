@@ -140,10 +140,29 @@ public data class OrderSnapshot(
         }
     }
 
-    @Suppress("UNUSED_PARAMETER")
     private fun applyTrade(event: OrderStateEvent.ExecutionReport.Trade): TransitionResult {
-        // TODO: Implement in Task 2 - Trade handling with computed quantities
-        return TransitionResult.Invalid("Trade event handling not yet implemented")
+        if (state !in OrderState.FILLABLE_STATES) {
+            return TransitionResult.Invalid("Cannot apply Trade in state $state")
+        }
+
+        if (event.execId in appliedExecIds) {
+            return TransitionResult.Duplicate(event.execId)
+        }
+
+        val newFilledQty = filledQty + event.fillQty
+        val newRemainingQty = currentQty - newFilledQty
+        val newState = if (newRemainingQty <= BigDecimal.ZERO) OrderState.FILLED else OrderState.PARTIALLY_FILLED
+
+        return TransitionResult.Success(
+            copy(
+                orderId = if (orderId.isEmpty()) event.orderId else orderId,
+                filledQty = newFilledQty,
+                avgFillPrice = calculateNewAvgPrice(event.fillQty, event.fillPrice),
+                state = newState,
+                lastUpdateTimestamp = event.timestamp,
+                appliedExecIds = appliedExecIds + event.execId,
+            ),
+        )
     }
 
     private fun applyCanceled(event: OrderStateEvent.ExecutionReport.Canceled): TransitionResult {
