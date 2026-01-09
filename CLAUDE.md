@@ -49,3 +49,7 @@ Throw `BotFatalException` on errors. No recovery, no graceful degradation. Excep
 ## No Coroutines or Spinlocks
 
 No polling loops, spinlocks, or busy-waiting. All control flow through Disruptor pipeline. Exception: command-sending coroutine for WebSocket bridge.
+
+## Git Workflow
+
+Always create Pull Requests for code changes. Never merge directly to main. Use feature branches and worktrees for isolation.
