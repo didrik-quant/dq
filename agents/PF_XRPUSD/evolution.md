@@ -196,3 +196,31 @@ com.didrikquant.core.BotFatalException: Invalid order transition: Order is in te
 ### Attempted Changes
 
 No changes
+
+---
+
+## Epoch 7 - FAILED at 2026-01-09 23:52 UTC
+
+### Failure: RUNTIME_CRASH
+
+```
+com.didrikquant.core.BotFatalException: Max loss exceeded: PnL=-122.033030400, limit=-25
+	at com.didrikquant.bot.handlers.TradingHandler.checkMaxLoss(TradingHandler.kt:114)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:44)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:25)
+	at com.lmax.disruptor.BatchEventProcessor.processEvents(BatchEventProcessor.java:167)
+	at com.lmax.disruptor.BatchEventProcessor.run(BatchEventProcessor.java:122)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+00:52:08.783 [1;31mERROR[0;39m [36mPipeline            [0;39m - Fatal error - canceling orders and exiting
+com.didrikquant.core.BotFatalException: Max loss exceeded: PnL=-122.033030400, limit=-25
+	at com.didrikquant.bot.handlers.TradingHandler.checkMaxLoss(TradingHandler.kt:114)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:44)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:25)
+	at com.lmax.disruptor.BatchEventProcessor.processEvents(BatchEventProcessor.java:167)
+	at com.lmax.disruptor.BatchEventProcessor.run(BatchEventProcessor.java:122)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+```
+
+### Attempted Changes
+
+No changes
