@@ -1,5 +1,6 @@
 package com.didrikquant.harness
 
+import java.math.BigDecimal
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.Properties
@@ -13,6 +14,8 @@ public data class HarnessConfig(
     val repoRoot: Path,
     val krakenApiKey: String? = null,
     val krakenApiSecret: String? = null,
+    val dataDir: Path,
+    val startingEquity: BigDecimal,
 ) {
     val agentDir: Path get() = repoRoot.resolve("agents").resolve(instrument)
     val evolutionLogPath: Path get() = agentDir.resolve("evolution.md")
@@ -32,6 +35,10 @@ public data class HarnessConfig(
             val strategyClass = get("HARNESS_STRATEGY_CLASS") ?: deriveStrategyClass(instrument)
             val krakenApiKey = get("KRAKEN_API_KEY")
             val krakenApiSecret = get("KRAKEN_API_SECRET")
+            val dataDir = get("DATA_DIR")?.let { Path.of(it) }
+                ?: Path.of(System.getProperty("user.home"), ".dq", "data")
+            val startingEquity = get("STARTING_EQUITY")?.toBigDecimalOrNull()
+                ?: BigDecimal(10000)
             val repoRoot = get("HARNESS_REPO_ROOT")?.let { Path.of(it) }
                 ?: error("HARNESS_REPO_ROOT must be set in ~/.dq/harness.env")
 
@@ -44,6 +51,8 @@ public data class HarnessConfig(
                 repoRoot = repoRoot,
                 krakenApiKey = krakenApiKey,
                 krakenApiSecret = krakenApiSecret,
+                dataDir = dataDir,
+                startingEquity = startingEquity,
             )
         }
 
