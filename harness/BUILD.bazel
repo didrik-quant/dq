@@ -4,6 +4,7 @@ load("@rules_kotlin//kotlin:lint.bzl", "ktlint_fix", "ktlint_test")
 kt_jvm_library(
     name = "harness_lib",
     srcs = glob(["src/main/kotlin/**/*.kt"]),
+    resources = glob(["src/main/resources/**"]),
     visibility = ["//visibility:public"],
     deps = [
         "//core",
