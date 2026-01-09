@@ -1,6 +1,5 @@
 package com.didrikquant.replay.metrics
 
-import com.didrikquant.core.Event
 import com.didrikquant.orderstate.Side
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -16,6 +15,13 @@ public data class PnLSnapshot(
     val avgEntryPrice: BigDecimal,
 )
 
+public data class Fill(
+    val symbol: String,
+    val side: Side,
+    val fillQty: BigDecimal,
+    val fillPrice: BigDecimal,
+)
+
 public class PnLTracker(
     private val symbol: String,
     private val feeRate: BigDecimal = BigDecimal("0.0002"),
@@ -27,18 +33,18 @@ public class PnLTracker(
     private var totalVolume: BigDecimal = BigDecimal.ZERO
     private var fillCount: Int = 0
 
-    public fun onFill(event: Event.OrderFill) {
-        if (event.symbol != symbol) return
+    public fun onFill(fill: Fill) {
+        if (fill.symbol != symbol) return
 
-        val notional = event.fillQty * event.fillPrice
+        val notional = fill.fillQty * fill.fillPrice
         val fee = notional * feeRate
         totalFees += fee
         totalVolume += notional
         fillCount++
 
-        when (event.side) {
-            Side.BUY -> processBuy(event.fillQty, event.fillPrice)
-            Side.SELL -> processSell(event.fillQty, event.fillPrice)
+        when (fill.side) {
+            Side.BUY -> processBuy(fill.fillQty, fill.fillPrice)
+            Side.SELL -> processSell(fill.fillQty, fill.fillPrice)
         }
     }
 

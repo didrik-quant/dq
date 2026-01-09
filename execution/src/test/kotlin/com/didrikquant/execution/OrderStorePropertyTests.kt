@@ -412,22 +412,20 @@ internal class OrderStorePropertyTests : FunSpec({
                 store.apply(accepted)
 
                 val fillQty = instruction.qty.divide(BigDecimal(2), 8, RoundingMode.DOWN)
-                val fill1 = OrderStateEvent.ExecutionReport.PartialFill(
+                val trade1 = OrderStateEvent.ExecutionReport.Trade(
                     clOrdId = instruction.clOrdId,
                     orderId = orderId,
                     execId = execId,
                     fillQty = fillQty,
                     fillPrice = fillPrice,
-                    cumQty = fillQty,
-                    leavesQty = instruction.qty - fillQty,
                     timestamp = ts + 1000,
                 )
 
-                val result1 = store.apply(fill1)
+                val result1 = store.apply(trade1)
                 result1.shouldBeInstanceOf<ApplyResult.Success>()
 
-                val fill2 = fill1.copy(timestamp = ts + 2000)
-                val result2 = store.apply(fill2)
+                val trade2 = trade1.copy(timestamp = ts + 2000)
+                val result2 = store.apply(trade2)
                 result2.shouldBeInstanceOf<ApplyResult.DuplicateExecution>()
                 (result2 as ApplyResult.DuplicateExecution).execId shouldBe execId
             }

@@ -92,7 +92,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
         }
     }
 
-    test("leavesQty equals currentQty minus filledQty") {
+    test("remainingQty equals currentQty minus filledQty") {
         checkAll(OrderStateArbs.validEventSequence()) { events ->
             var snapshot = OrderSnapshot.fromInstruction(
                 events.first() as OrderStateEvent.Instruction.Create,
@@ -102,7 +102,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
                 val result = snapshot.apply(event)
                 if (result is TransitionResult.Success) {
                     snapshot = result.snapshot
-                    snapshot.leavesQty shouldBe (snapshot.currentQty - snapshot.filledQty)
+                    snapshot.remainingQty shouldBe (snapshot.currentQty - snapshot.filledQty)
                 }
             }
         }
@@ -126,7 +126,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
         }
     }
 
-    test("FILLED state implies filledQty equals cumQty from final fill") {
+    test("FILLED state implies remainingQty is zero") {
         checkAll(OrderStateArbs.validEventSequenceEndingInFilled()) { events ->
             var snapshot = OrderSnapshot.fromInstruction(
                 events.first() as OrderStateEvent.Instruction.Create,
@@ -140,8 +140,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
             }
 
             snapshot.state shouldBe OrderState.FILLED
-            val filledEvent = events.last() as OrderStateEvent.ExecutionReport.Filled
-            snapshot.filledQty shouldBe filledEvent.cumQty
+            snapshot.remainingQty shouldBeLessThanOrEqualTo BigDecimal.ZERO
         }
     }
 
@@ -164,11 +163,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
                     event.price shouldBeGreaterThan BigDecimal.ZERO
                     event.qty shouldBeGreaterThan BigDecimal.ZERO
                 }
-                is OrderStateEvent.ExecutionReport.PartialFill -> {
-                    event.fillPrice shouldBeGreaterThan BigDecimal.ZERO
-                    event.fillQty shouldBeGreaterThan BigDecimal.ZERO
-                }
-                is OrderStateEvent.ExecutionReport.Filled -> {
+                is OrderStateEvent.ExecutionReport.Trade -> {
                     event.fillPrice shouldBeGreaterThan BigDecimal.ZERO
                     event.fillQty shouldBeGreaterThan BigDecimal.ZERO
                 }
@@ -188,10 +183,8 @@ internal class OrderSnapshotPropertyTests : FunSpec({
             val fillPrices = mutableListOf<BigDecimal>()
 
             events.drop(1).forEach { event ->
-                when (event) {
-                    is OrderStateEvent.ExecutionReport.PartialFill -> fillPrices.add(event.fillPrice)
-                    is OrderStateEvent.ExecutionReport.Filled -> fillPrices.add(event.fillPrice)
-                    else -> {}
+                if (event is OrderStateEvent.ExecutionReport.Trade) {
+                    fillPrices.add(event.fillPrice)
                 }
                 val result = snapshot.apply(event)
                 if (result is TransitionResult.Success) {
@@ -244,8 +237,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
                 it is OrderStateEvent.ExecutionReport.Accepted
             }
             val firstFillIndex = events.indexOfFirst {
-                it is OrderStateEvent.ExecutionReport.PartialFill ||
-                    it is OrderStateEvent.ExecutionReport.Filled
+                it is OrderStateEvent.ExecutionReport.Trade
             }
 
             if (firstFillIndex >= 0) {
@@ -257,8 +249,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
     test("at most one terminal event per sequence") {
         checkAll(OrderStateArbs.validEventSequence()) { events ->
             val terminalCount = events.count { event ->
-                event is OrderStateEvent.ExecutionReport.Filled ||
-                    event is OrderStateEvent.ExecutionReport.Canceled ||
+                event is OrderStateEvent.ExecutionReport.Canceled ||
                     event is OrderStateEvent.ExecutionReport.Rejected ||
                     event is OrderStateEvent.ExecutionReport.Expired
             }

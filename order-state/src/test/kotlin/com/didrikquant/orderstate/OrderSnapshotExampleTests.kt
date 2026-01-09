@@ -39,7 +39,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         snapshot.clOrdId shouldBe "order-001"
         snapshot.orderId shouldBe ""
         snapshot.filledQty shouldBe BigDecimal.ZERO
-        snapshot.leavesQty shouldBe BigDecimal("10.00")
+        snapshot.remainingQty shouldBe BigDecimal("10.00")
 
         // Accept order
         val accepted = OrderStateEvent.ExecutionReport.Accepted(
@@ -58,42 +58,39 @@ internal class OrderSnapshotExampleTests : FunSpec({
         snapshot.orderId shouldBe "exchange-order-123"
 
         // Partial fill
-        val partialFill = OrderStateEvent.ExecutionReport.PartialFill(
+        val trade1 = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-001",
             orderId = "exchange-order-123",
             execId = "exec-001",
             fillQty = BigDecimal("3.00"),
             fillPrice = BigDecimal("99.50"),
-            cumQty = BigDecimal("3.00"),
-            leavesQty = BigDecimal("7.00"),
             timestamp = 1002L,
         )
-        val partialResult = snapshot.apply(partialFill)
+        val partialResult = snapshot.apply(trade1)
         partialResult.shouldBeInstanceOf<TransitionResult.Success>()
         snapshot = (partialResult as TransitionResult.Success).snapshot
 
         snapshot.state shouldBe OrderState.PARTIALLY_FILLED
         snapshot.filledQty shouldBe BigDecimal("3.00")
-        snapshot.leavesQty shouldBe BigDecimal("7.00")
+        snapshot.remainingQty shouldBe BigDecimal("7.00")
         snapshot.avgFillPrice shouldBe BigDecimal("99.50")
 
         // Final fill
-        val filled = OrderStateEvent.ExecutionReport.Filled(
+        val trade2 = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-001",
             orderId = "exchange-order-123",
             execId = "exec-002",
             fillQty = BigDecimal("7.00"),
             fillPrice = BigDecimal("100.00"),
-            cumQty = BigDecimal("10.00"),
             timestamp = 1003L,
         )
-        val filledResult = snapshot.apply(filled)
+        val filledResult = snapshot.apply(trade2)
         filledResult.shouldBeInstanceOf<TransitionResult.Success>()
         snapshot = (filledResult as TransitionResult.Success).snapshot
 
         snapshot.state shouldBe OrderState.FILLED
         snapshot.filledQty shouldBe BigDecimal("10.00")
-        snapshot.leavesQty shouldBeNumerically BigDecimal.ZERO
+        snapshot.remainingQty shouldBeNumerically BigDecimal.ZERO
         snapshot.isTerminal shouldBe true
     }
 
@@ -143,17 +140,15 @@ internal class OrderSnapshotExampleTests : FunSpec({
         snapshot = (snapshot.apply(accepted) as TransitionResult.Success).snapshot
 
         // Partial fill
-        val partialFill = OrderStateEvent.ExecutionReport.PartialFill(
+        val trade = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-003",
             orderId = "ex-456",
             execId = "exec-003",
             fillQty = BigDecimal("5.00"),
             fillPrice = BigDecimal("199.00"),
-            cumQty = BigDecimal("5.00"),
-            leavesQty = BigDecimal("15.00"),
             timestamp = 3002L,
         )
-        snapshot = (snapshot.apply(partialFill) as TransitionResult.Success).snapshot
+        snapshot = (snapshot.apply(trade) as TransitionResult.Success).snapshot
 
         // Cancel remaining
         val canceled = OrderStateEvent.ExecutionReport.Canceled(
@@ -214,16 +209,15 @@ internal class OrderSnapshotExampleTests : FunSpec({
         snapshot.state shouldBe OrderState.OPEN
 
         // Fill at new price
-        val filled = OrderStateEvent.ExecutionReport.Filled(
+        val trade = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-004",
             orderId = "ex-790",
             execId = "exec-004",
             fillQty = BigDecimal("10.00"),
             fillPrice = BigDecimal("145.00"),
-            cumQty = BigDecimal("10.00"),
             timestamp = 4003L,
         )
-        snapshot = (snapshot.apply(filled) as TransitionResult.Success).snapshot
+        snapshot = (snapshot.apply(trade) as TransitionResult.Success).snapshot
 
         snapshot.state shouldBe OrderState.FILLED
     }
@@ -268,17 +262,16 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         val snapshot = OrderSnapshot.fromInstruction(create)
 
-        val fill = OrderStateEvent.ExecutionReport.Filled(
+        val trade = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-006",
             orderId = "ex-111",
             execId = "exec-006",
             fillQty = BigDecimal("5.00"),
             fillPrice = BigDecimal("100.00"),
-            cumQty = BigDecimal("5.00"),
             timestamp = 6001L,
         )
 
-        val result = snapshot.apply(fill)
+        val result = snapshot.apply(trade)
         result.shouldBeInstanceOf<TransitionResult.Success>()
         val filled = (result as TransitionResult.Success).snapshot
         filled.state shouldBe OrderState.FILLED
@@ -398,31 +391,28 @@ internal class OrderSnapshotExampleTests : FunSpec({
         snapshot = (snapshot.apply(accepted) as TransitionResult.Success).snapshot
 
         // First fill: 4 units @ 100
-        val fill1 = OrderStateEvent.ExecutionReport.PartialFill(
+        val trade1 = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-010",
             orderId = "ex-444",
             execId = "exec-010a",
             fillQty = BigDecimal("4.00"),
             fillPrice = BigDecimal("100.00"),
-            cumQty = BigDecimal("4.00"),
-            leavesQty = BigDecimal("6.00"),
             timestamp = 10002L,
         )
-        snapshot = (snapshot.apply(fill1) as TransitionResult.Success).snapshot
+        snapshot = (snapshot.apply(trade1) as TransitionResult.Success).snapshot
         snapshot.avgFillPrice!! shouldBeNumerically BigDecimal("100.00")
 
         // Second fill: 6 units @ 102
         // Weighted avg = (4*100 + 6*102) / 10 = (400 + 612) / 10 = 101.2
-        val fill2 = OrderStateEvent.ExecutionReport.Filled(
+        val trade2 = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-010",
             orderId = "ex-444",
             execId = "exec-010b",
             fillQty = BigDecimal("6.00"),
             fillPrice = BigDecimal("102.00"),
-            cumQty = BigDecimal("10.00"),
             timestamp = 10003L,
         )
-        snapshot = (snapshot.apply(fill2) as TransitionResult.Success).snapshot
+        snapshot = (snapshot.apply(trade2) as TransitionResult.Success).snapshot
         snapshot.avgFillPrice!! shouldBeNumerically BigDecimal("101.20")
     }
 
@@ -563,33 +553,29 @@ internal class OrderSnapshotExampleTests : FunSpec({
         snapshot = (snapshot.apply(accepted) as TransitionResult.Success).snapshot
 
         // First fill - should succeed
-        val fill1 = OrderStateEvent.ExecutionReport.PartialFill(
+        val trade1 = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-dup-001",
             orderId = "ex-dup",
             execId = "exec-same-id",
             fillQty = BigDecimal("5.00"),
             fillPrice = BigDecimal("100.00"),
-            cumQty = BigDecimal("5.00"),
-            leavesQty = BigDecimal("5.00"),
             timestamp = 20002L,
         )
-        val result1 = snapshot.apply(fill1)
+        val result1 = snapshot.apply(trade1)
         result1.shouldBeInstanceOf<TransitionResult.Success>()
         snapshot = (result1 as TransitionResult.Success).snapshot
         snapshot.filledQty shouldBe BigDecimal("5.00")
 
         // Duplicate fill with same execId - should be rejected
-        val fill2 = OrderStateEvent.ExecutionReport.PartialFill(
+        val trade2 = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-dup-001",
             orderId = "ex-dup",
             execId = "exec-same-id", // Same execId!
             fillQty = BigDecimal("5.00"),
             fillPrice = BigDecimal("100.00"),
-            cumQty = BigDecimal("10.00"),
-            leavesQty = BigDecimal("0.00"),
             timestamp = 20003L,
         )
-        val result2 = snapshot.apply(fill2)
+        val result2 = snapshot.apply(trade2)
         result2.shouldBeInstanceOf<TransitionResult.Duplicate>()
 
         // filledQty should NOT have changed
@@ -679,17 +665,15 @@ internal class OrderSnapshotExampleTests : FunSpec({
         snapshot = (snapshot.apply(accepted) as TransitionResult.Success).snapshot
 
         // Partial fill
-        val partialFill = OrderStateEvent.ExecutionReport.PartialFill(
+        val trade = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-pf-exp",
             orderId = "ex-pf-exp",
             execId = "exec-pf-exp",
             fillQty = BigDecimal("3.00"),
             fillPrice = BigDecimal("99.00"),
-            cumQty = BigDecimal("3.00"),
-            leavesQty = BigDecimal("7.00"),
             timestamp = 23002L,
         )
-        snapshot = (snapshot.apply(partialFill) as TransitionResult.Success).snapshot
+        snapshot = (snapshot.apply(trade) as TransitionResult.Success).snapshot
         snapshot.state shouldBe OrderState.PARTIALLY_FILLED
 
         // Order expires (e.g., GTD expiration)
@@ -708,57 +692,6 @@ internal class OrderSnapshotExampleTests : FunSpec({
         snapshot.filledQty shouldBe BigDecimal("3.00")
         snapshot.hasFills shouldBe true
         snapshot.avgFillPrice shouldBe BigDecimal("99.00")
-    }
-
-    test("cumQty mismatch is detected and reported") {
-        val create = OrderStateEvent.Instruction.Create(
-            clOrdId = "order-cumqty",
-            side = Side.BUY,
-            price = BigDecimal("100.00"),
-            qty = BigDecimal("10.00"),
-            timestamp = 24000L,
-        )
-        var snapshot = OrderSnapshot.fromInstruction(create)
-
-        val accepted = OrderStateEvent.ExecutionReport.Accepted(
-            clOrdId = "order-cumqty",
-            orderId = "ex-cumqty",
-            side = Side.BUY,
-            price = BigDecimal("100.00"),
-            qty = BigDecimal("10.00"),
-            timestamp = 24001L,
-        )
-        snapshot = (snapshot.apply(accepted) as TransitionResult.Success).snapshot
-
-        // First fill
-        val fill1 = OrderStateEvent.ExecutionReport.PartialFill(
-            clOrdId = "order-cumqty",
-            orderId = "ex-cumqty",
-            execId = "exec-cumqty-1",
-            fillQty = BigDecimal("3.00"),
-            fillPrice = BigDecimal("100.00"),
-            cumQty = BigDecimal("3.00"),
-            leavesQty = BigDecimal("7.00"),
-            timestamp = 24002L,
-        )
-        snapshot = (snapshot.apply(fill1) as TransitionResult.Success).snapshot
-
-        // Second fill with WRONG cumQty (says 8.00 but should be 3+2=5)
-        val fill2 = OrderStateEvent.ExecutionReport.PartialFill(
-            clOrdId = "order-cumqty",
-            orderId = "ex-cumqty",
-            execId = "exec-cumqty-2",
-            fillQty = BigDecimal("2.00"),
-            fillPrice = BigDecimal("100.00"),
-            cumQty = BigDecimal("8.00"), // WRONG! Should be 5.00
-            leavesQty = BigDecimal("2.00"),
-            timestamp = 24003L,
-        )
-        val result = snapshot.apply(fill2)
-        // Should return a warning result indicating the mismatch
-        result.shouldBeInstanceOf<TransitionResult.SuccessWithWarning>()
-        val warning = (result as TransitionResult.SuccessWithWarning).warning
-        warning shouldBe "cumQty mismatch: expected 5.00 but got 8.00"
     }
 
     test("appliedExecIds tracks all processed fills") {
@@ -782,29 +715,26 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
         snapshot = (snapshot.apply(accepted) as TransitionResult.Success).snapshot
 
-        val fill1 = OrderStateEvent.ExecutionReport.PartialFill(
+        val trade1 = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-track-exec",
             orderId = "ex-track",
             execId = "exec-track-001",
             fillQty = BigDecimal("3.00"),
             fillPrice = BigDecimal("100.00"),
-            cumQty = BigDecimal("3.00"),
-            leavesQty = BigDecimal("7.00"),
             timestamp = 25002L,
         )
-        snapshot = (snapshot.apply(fill1) as TransitionResult.Success).snapshot
+        snapshot = (snapshot.apply(trade1) as TransitionResult.Success).snapshot
         snapshot.appliedExecIds shouldBe setOf("exec-track-001")
 
-        val fill2 = OrderStateEvent.ExecutionReport.Filled(
+        val trade2 = OrderStateEvent.ExecutionReport.Trade(
             clOrdId = "order-track-exec",
             orderId = "ex-track",
             execId = "exec-track-002",
             fillQty = BigDecimal("7.00"),
             fillPrice = BigDecimal("100.00"),
-            cumQty = BigDecimal("10.00"),
             timestamp = 25003L,
         )
-        snapshot = (snapshot.apply(fill2) as TransitionResult.Success).snapshot
+        snapshot = (snapshot.apply(trade2) as TransitionResult.Success).snapshot
         snapshot.appliedExecIds shouldBe setOf("exec-track-001", "exec-track-002")
     }
 })
