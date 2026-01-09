@@ -36,6 +36,8 @@ public class KrakenPublicWs(
 
     @Volatile
     private var ready: Boolean = false
+    @Volatile
+    private var shutdown: Boolean = false
 
     public fun isReady(): Boolean = ready
 
@@ -66,6 +68,7 @@ public class KrakenPublicWs(
                 }
 
                 ready = false
+                if (shutdown) return@launch
                 logger.info { "Reconnecting Futures WS in 5 seconds..." }
                 delay(5000)
             }
@@ -187,6 +190,7 @@ public class KrakenPublicWs(
     }
 
     public fun close() {
+        shutdown = true
         job?.cancel()
         client.close()
     }

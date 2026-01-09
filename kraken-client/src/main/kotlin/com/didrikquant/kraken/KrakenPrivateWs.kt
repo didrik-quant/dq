@@ -39,6 +39,8 @@ public class KrakenPrivateWs(
 
     @Volatile
     private var ready: Boolean = false
+    @Volatile
+    private var shutdown: Boolean = false
     private val subscribedFeeds = mutableSetOf<String>()
     private val requiredFeeds = setOf("fills", "open_orders", "open_positions")
 
@@ -91,6 +93,7 @@ public class KrakenPrivateWs(
                 }
 
                 ready = false
+                if (shutdown) return@launch
                 logger.info { "Reconnecting private Futures WS in 5 seconds..." }
                 delay(5000)
             }
@@ -406,6 +409,7 @@ public class KrakenPrivateWs(
     }
 
     public fun close() {
+        shutdown = true
         job?.cancel()
         commandChannel.close()
         client.close()
