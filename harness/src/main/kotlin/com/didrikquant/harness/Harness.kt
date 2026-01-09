@@ -9,6 +9,17 @@ import java.util.concurrent.TimeUnit
 
 private val logger = KotlinLogging.logger {}
 
+private const val CYAN = "\u001B[36m"
+private const val YELLOW = "\u001B[33m"
+private const val RED = "\u001B[31m"
+private const val RESET = "\u001B[0m"
+
+private fun harnessLog(msg: String, error: Boolean = false) {
+    val timestamp = java.time.LocalTime.now().format(java.time.format.DateTimeFormatter.ofPattern("HH:mm:ss.SSS"))
+    val color = if (error) RED else CYAN
+    println("$color$timestamp [HARNESS] $msg$RESET")
+}
+
 public class Harness(private val config: HarnessConfig) {
 
     private val worktreeManager = WorktreeManager(config.repoRoot)
@@ -17,15 +28,15 @@ public class Harness(private val config: HarnessConfig) {
     private val sharpeCalculator = SharpeCalculator(config.dataDir)
 
     public fun run() {
-        logger.info { "Starting harness for ${config.instrument}" }
-        logger.info { "Strategy class: ${config.strategyClass}" }
-        logger.info { "Epoch trades: ${config.epochTradeCount}" }
-        logger.info { "Epoch max duration: ${config.epochMaxDurationMs}ms (safety timeout)" }
-        logger.info { "Repo root: ${config.repoRoot}" }
-        logger.info { "Data dir: ${config.dataDir}" }
-        logger.info { "Starting equity: ${config.startingEquity}" }
-        logger.info { "Skip agent: ${config.skipAgent}" }
-        logger.info { "Dry run: ${config.dryRun}" }
+        harnessLog("Starting harness for ${config.instrument}")
+        harnessLog("Strategy class: ${config.strategyClass}")
+        harnessLog("Epoch trades: ${config.epochTradeCount}")
+        harnessLog("Epoch max duration: ${config.epochMaxDurationMs}ms (safety timeout)")
+        harnessLog("Repo root: ${config.repoRoot}")
+        harnessLog("Data dir: ${config.dataDir}")
+        harnessLog("Starting equity: ${config.startingEquity}")
+        harnessLog("Skip agent: ${config.skipAgent}")
+        harnessLog("Dry run: ${config.dryRun}")
 
         Files.createDirectories(config.agentDir)
 
@@ -38,13 +49,13 @@ public class Harness(private val config: HarnessConfig) {
         val epoch = evolutionLog.currentEpoch() + 1
         val branchName = "epoch-$epoch-${config.instrument}"
 
-        logger.info { "=== Starting Epoch $epoch ===" }
+        harnessLog("=== Starting Epoch $epoch ===")
 
         val worktreePath = worktreeManager.create(branchName)
 
         try {
             if (config.skipAgent) {
-                logger.info { "Skipping agent (HARNESS_SKIP_AGENT=true)" }
+                harnessLog("Skipping agent (HARNESS_SKIP_AGENT=true)")
             } else {
                 spawnAgent(worktreePath, epoch)
             }
@@ -69,7 +80,7 @@ public class Harness(private val config: HarnessConfig) {
                 } else {
                     "RUNTIME_CRASH"
                 }
-                logger.error { "Bot failed: $failureType" }
+                harnessLog("Bot failed: $failureType", error = true)
                 evolutionLog.appendFailure(epoch, diff, failureType, botResult.error ?: "Unknown error")
                 commitEvolutionLog("Epoch $epoch: $failureType")
                 // Don't merge failed code back to main
@@ -88,7 +99,7 @@ public class Harness(private val config: HarnessConfig) {
                 null
             }
 
-            logger.info { "Epoch $epoch Sharpe: ${sharpe ?: "insufficient data"}" }
+            harnessLog("Epoch $epoch Sharpe: ${sharpe ?: "insufficient data"}")
             evolutionLog.append(epoch, startTime, endTime, diff, sharpe ?: BigDecimal.ZERO)
 
             worktreeManager.commitAndMerge(worktreePath, branchName, "Epoch $epoch: ${config.instrument}")
@@ -96,14 +107,14 @@ public class Harness(private val config: HarnessConfig) {
             worktreeManager.delete(worktreePath, branchName)
         }
 
-        logger.info { "=== Completed Epoch $epoch ===" }
+        harnessLog("=== Completed Epoch $epoch ===")
     }
 
     private fun spawnAgent(worktreePath: Path, epoch: Int) {
         val prompt = buildAgentPrompt(worktreePath, epoch)
-        logger.info { "Spawning Claude Code agent in $worktreePath" }
+        harnessLog("Spawning Claude Code agent in $worktreePath")
         claudeClient.runPrompt(worktreePath, prompt)
-        logger.info { "Agent completed" }
+        harnessLog("Agent completed")
     }
 
     private fun buildAgentPrompt(worktreePath: Path, epoch: Int): String {
@@ -204,7 +215,7 @@ public class Harness(private val config: HarnessConfig) {
     )
 
     private fun build(worktreePath: Path): BuildResult {
-        logger.info { "Building bot in $worktreePath" }
+        harnessLog("Building bot in $worktreePath")
 
         val process = ProcessBuilder("bazel", "build", "//bot")
             .directory(worktreePath.toFile())
@@ -246,20 +257,20 @@ public class Harness(private val config: HarnessConfig) {
     }
 
     private fun runBot(worktreePath: Path, bazelBinPath: String, epoch: Int): BotResult {
-        logger.info { "Running bot for ${config.epochTradeCount} trades (max ${config.epochMaxDurationMs}ms)" }
+        harnessLog("Running bot for ${config.epochTradeCount} trades (max ${config.epochMaxDurationMs}ms)")
 
         // Create per-epoch log file
         val logDir = config.agentDir.resolve("logs")
         Files.createDirectories(logDir)
         val logFile = logDir.resolve("epoch-$epoch.log")
         val logWriter = Files.newBufferedWriter(logFile)
-        logger.info { "Writing bot log to $logFile" }
+        harnessLog("Writing bot log to $logFile")
 
         // Run the bot launcher directly instead of via `bazel run` to ensure
         // clean process exit propagation. The bot was already built by build().
         val botLauncher = "$bazelBinPath/bot/bot"
-        logger.info { "Bot launcher: $botLauncher" }
-        logger.info { "Working directory: $worktreePath" }
+        harnessLog("Bot launcher: $botLauncher")
+        harnessLog("Working directory: $worktreePath")
         val args = buildList {
             add(botLauncher)
             add("--epoch-trades=${config.epochTradeCount}")
@@ -287,7 +298,7 @@ public class Harness(private val config: HarnessConfig) {
 
         val outputThread = Thread {
             process.inputStream.bufferedReader().forEachLine { line ->
-                logger.info { "[BOT] $line" }
+                println(line)
                 outputCapture.appendLine(line)
                 logWriter.write(line)
                 logWriter.newLine()
@@ -303,7 +314,7 @@ public class Harness(private val config: HarnessConfig) {
         val completed = process.waitFor(timeoutMs, TimeUnit.MILLISECONDS)
 
         if (!completed) {
-            logger.warn { "Bot did not exit within timeout, killing process" }
+            harnessLog("Bot did not exit within timeout, killing process", error = true)
             process.destroyForcibly()
             process.waitFor(10, TimeUnit.SECONDS)
         }
@@ -311,10 +322,10 @@ public class Harness(private val config: HarnessConfig) {
         outputThread.join(2000)
 
         logWriter.close()
-        logger.info { "Bot log written to $logFile" }
+        harnessLog("Bot log written to $logFile")
 
         val exitCode = process.exitValue()
-        logger.info { "Bot exited with code: $exitCode" }
+        harnessLog("Bot exited with code: $exitCode")
 
         return if (exitCode != 0) {
             val error = extractCrashError(outputCapture.toString())
@@ -353,7 +364,7 @@ public class Harness(private val config: HarnessConfig) {
                 .inheritIO()
                 .start()
             commitProcess.waitFor()
-            logger.info { "Committed evolution log: $message" }
+            harnessLog("Committed evolution log: $message")
         }
     }
 }
