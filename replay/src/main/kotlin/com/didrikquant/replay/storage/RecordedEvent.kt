@@ -3,6 +3,7 @@ package com.didrikquant.replay.storage
 import com.didrikquant.core.ConnectionType
 import com.didrikquant.core.Event
 import com.didrikquant.core.PriceLevel
+import com.didrikquant.orderstate.Side
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -72,6 +73,11 @@ public data class RecordedEvent(
 public fun Event.extractTimestamp(): Long = when (this) {
     is Event.BookSnapshot -> timestamp
     is Event.BookUpdate -> timestamp
+    is Event.OrderAccepted -> timestamp
+    is Event.OrderFill -> timestamp
+    is Event.OrderCanceled -> timestamp
+    is Event.OrderAmended -> timestamp
+    is Event.OrderRejected -> timestamp
     is Event.Connected -> timestamp
     is Event.Disconnected -> timestamp
     is Event.Heartbeat -> timestamp
@@ -88,6 +94,21 @@ private data class EventDto(
     val timestamp: Long? = null,
     val reason: String? = null,
     val connectionType: String? = null,
+    // Order event fields
+    val orderId: String? = null,
+    val clOrdId: String? = null,
+    val execId: String? = null,
+    val side: String? = null,
+    val price: String? = null,
+    val qty: String? = null,
+    val fillQty: String? = null,
+    val fillPrice: String? = null,
+    val cumQty: String? = null,
+    val leavesQty: String? = null,
+    val oldOrderId: String? = null,
+    val newOrderId: String? = null,
+    val newPrice: String? = null,
+    val newQty: String? = null,
 ) {
     fun toEvent(): Event = when (type) {
         "BookSnapshot" -> Event.BookSnapshot(
@@ -115,6 +136,46 @@ private data class EventDto(
         )
         "Heartbeat" -> Event.Heartbeat(timestamp = timestamp!!)
         "Shutdown" -> Event.Shutdown
+        "OrderAccepted" -> Event.OrderAccepted(
+            orderId = orderId!!,
+            clOrdId = clOrdId!!,
+            symbol = symbol!!,
+            side = Side.valueOf(side!!),
+            price = BigDecimal(price!!),
+            qty = BigDecimal(qty!!),
+            timestamp = timestamp!!,
+        )
+        "OrderFill" -> Event.OrderFill(
+            orderId = orderId!!,
+            clOrdId = clOrdId!!,
+            execId = execId!!,
+            symbol = symbol!!,
+            side = Side.valueOf(side!!),
+            fillQty = BigDecimal(fillQty!!),
+            fillPrice = BigDecimal(fillPrice!!),
+            cumQty = BigDecimal(cumQty!!),
+            leavesQty = BigDecimal(leavesQty!!),
+            timestamp = timestamp!!,
+        )
+        "OrderCanceled" -> Event.OrderCanceled(
+            orderId = orderId!!,
+            clOrdId = clOrdId!!,
+            reason = reason!!,
+            timestamp = timestamp!!,
+        )
+        "OrderAmended" -> Event.OrderAmended(
+            oldOrderId = oldOrderId!!,
+            newOrderId = newOrderId!!,
+            clOrdId = clOrdId!!,
+            newPrice = BigDecimal(newPrice!!),
+            newQty = newQty?.let { BigDecimal(it) },
+            timestamp = timestamp!!,
+        )
+        "OrderRejected" -> Event.OrderRejected(
+            clOrdId = clOrdId!!,
+            reason = reason!!,
+            timestamp = timestamp!!,
+        )
         else -> throw IllegalArgumentException("Unknown event type: $type")
     }
 
@@ -152,6 +213,51 @@ private data class EventDto(
                 timestamp = event.timestamp,
             )
             is Event.Shutdown -> EventDto(type = "Shutdown")
+            is Event.OrderAccepted -> EventDto(
+                type = "OrderAccepted",
+                orderId = event.orderId,
+                clOrdId = event.clOrdId,
+                symbol = event.symbol,
+                side = event.side.name,
+                price = event.price.toPlainString(),
+                qty = event.qty.toPlainString(),
+                timestamp = event.timestamp,
+            )
+            is Event.OrderFill -> EventDto(
+                type = "OrderFill",
+                orderId = event.orderId,
+                clOrdId = event.clOrdId,
+                execId = event.execId,
+                symbol = event.symbol,
+                side = event.side.name,
+                fillQty = event.fillQty.toPlainString(),
+                fillPrice = event.fillPrice.toPlainString(),
+                cumQty = event.cumQty.toPlainString(),
+                leavesQty = event.leavesQty.toPlainString(),
+                timestamp = event.timestamp,
+            )
+            is Event.OrderCanceled -> EventDto(
+                type = "OrderCanceled",
+                orderId = event.orderId,
+                clOrdId = event.clOrdId,
+                reason = event.reason,
+                timestamp = event.timestamp,
+            )
+            is Event.OrderAmended -> EventDto(
+                type = "OrderAmended",
+                oldOrderId = event.oldOrderId,
+                newOrderId = event.newOrderId,
+                clOrdId = event.clOrdId,
+                newPrice = event.newPrice.toPlainString(),
+                newQty = event.newQty?.toPlainString(),
+                timestamp = event.timestamp,
+            )
+            is Event.OrderRejected -> EventDto(
+                type = "OrderRejected",
+                clOrdId = event.clOrdId,
+                reason = event.reason,
+                timestamp = event.timestamp,
+            )
         }
     }
 }
