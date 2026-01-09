@@ -56,3 +56,31 @@ com.didrikquant.core.BotFatalException: RISK BREACH: Max open orders reached: 10
 ### Attempted Changes
 
 No changes
+
+---
+
+## Epoch 2 - FAILED at 2026-01-09 22:29 UTC
+
+### Failure: RISK_BREACH
+
+```
+com.didrikquant.core.BotFatalException: RISK BREACH: Max open orders reached: 10
+	at com.didrikquant.bot.handlers.TradingHandler.processStrategyActions(TradingHandler.kt:177)
+	at com.didrikquant.bot.handlers.TradingHandler.processBookEvents(TradingHandler.kt:131)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:46)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:25)
+	at com.lmax.disruptor.BatchEventProcessor.processEvents(BatchEventProcessor.java:167)
+	at com.lmax.disruptor.BatchEventProcessor.run(BatchEventProcessor.java:122)
+	at java.base/java.lang.Thread.run(Thread.java:1583)
+23:29:05.671 [1;31mERROR[0;39m [36mPipeline            [0;39m - Fatal error - canceling orders and exiting
+com.didrikquant.core.BotFatalException: RISK BREACH: Max open orders reached: 10
+	at com.didrikquant.bot.handlers.TradingHandler.processStrategyActions(TradingHandler.kt:177)
+	at com.didrikquant.bot.handlers.TradingHandler.processBookEvents(TradingHandler.kt:131)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:46)
+	at com.didrikquant.bot.handlers.TradingHandler.onEvent(TradingHandler.kt:25)
+	at com.lmax.disruptor.BatchEventProcessor.processEvents(BatchEventProcessor.java:167)
+```
+
+### Attempted Changes
+
+No changes
