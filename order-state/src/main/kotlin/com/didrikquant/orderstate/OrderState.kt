@@ -38,8 +38,8 @@ public enum class OrderState {
         /** States where the order is live and can receive fills */
         public val ACTIVE_STATES: Set<OrderState> = setOf(OPEN, PARTIALLY_FILLED)
 
-        /** States where the order can receive fills */
-        public val FILLABLE_STATES: Set<OrderState> = setOf(OPEN, PARTIALLY_FILLED)
+        /** States where the order can receive fills (includes PENDING_NEW for race conditions where fill arrives before Accepted) */
+        public val FILLABLE_STATES: Set<OrderState> = setOf(PENDING_NEW, OPEN, PARTIALLY_FILLED)
 
         /** States where the order can be canceled */
         public val CANCELABLE_STATES: Set<OrderState> = setOf(PENDING_NEW, OPEN, PARTIALLY_FILLED)

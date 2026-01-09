@@ -257,7 +257,8 @@ internal class OrderSnapshotExampleTests : FunSpec({
             "Event clOrdId 'wrong-order' doesn't match order 'order-005'"
     }
 
-    test("cannot apply fill to pending_new order") {
+    test("fill can be applied to pending_new order (race condition handling)") {
+        // This handles the race condition where a fill arrives before the Accepted event
         val create = OrderStateEvent.Instruction.Create(
             clOrdId = "order-006",
             side = Side.BUY,
@@ -278,7 +279,10 @@ internal class OrderSnapshotExampleTests : FunSpec({
         )
 
         val result = snapshot.apply(fill)
-        result.shouldBeInstanceOf<TransitionResult.Invalid>()
+        result.shouldBeInstanceOf<TransitionResult.Success>()
+        val filled = (result as TransitionResult.Success).snapshot
+        filled.state shouldBe OrderState.FILLED
+        filled.filledQty shouldBe BigDecimal("5.00")
     }
 
     test("cannot apply events to terminal state") {
