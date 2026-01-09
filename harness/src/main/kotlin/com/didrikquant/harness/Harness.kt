@@ -207,11 +207,11 @@ public class Harness(private val config: HarnessConfig) {
     private fun runBot(worktreePath: Path): BotResult {
         logger.info { "Running bot for ${config.epochTradeCount} trades (max ${config.epochMaxDurationMs}ms)" }
 
+        // Run the bot launcher directly instead of via `bazel run` to ensure
+        // clean process exit propagation. The bot was already built by build().
+        val botLauncher = worktreePath.resolve("bazel-bin/bot/bot").toString()
         val args = listOf(
-            "bazel",
-            "run",
-            "//bot",
-            "--",
+            botLauncher,
             "--epoch-trades=${config.epochTradeCount}",
             "--epoch-max-duration=${config.epochMaxDurationMs}",
             "--strategy=${config.strategyClass}",
