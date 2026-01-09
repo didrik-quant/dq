@@ -1,7 +1,7 @@
 package com.didrikquant.replay.metrics
 
 import com.didrikquant.core.Event
-import com.didrikquant.core.Side
+import com.didrikquant.orderstate.Side
 import java.math.BigDecimal
 import java.math.RoundingMode
 

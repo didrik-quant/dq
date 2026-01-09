@@ -8,6 +8,7 @@ kt_jvm_library(
     deps = [
         "//:kotlin_serialization",
         "//core",
+        "//order-state",
         "@maven//:io_github_microutils_kotlin_logging_jvm",
         "@maven//:io_ktor_ktor_client_cio_jvm",
         "@maven//:io_ktor_ktor_client_content_negotiation_jvm",

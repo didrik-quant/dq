@@ -1,7 +1,7 @@
 package com.didrikquant.risk
 
 import com.didrikquant.core.OrderIntent
-import com.didrikquant.core.Side
+import com.didrikquant.orderstate.Side
 import com.didrikquant.core.absoluteValue
 import java.math.BigDecimal
 

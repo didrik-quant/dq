@@ -10,6 +10,7 @@ kt_jvm_library(
         "//core",
         "//execution",
         "//kraken-client",
+        "//order-state",
         "//replay",
         "//risk",
         "//strategy",

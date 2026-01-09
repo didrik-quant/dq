@@ -2,10 +2,10 @@ package com.didrikquant.strategy
 
 import com.didrikquant.core.OrderBookSnapshot
 import com.didrikquant.core.OrderIntent
-import com.didrikquant.core.Side
 import com.didrikquant.core.StrategyAction
-import com.didrikquant.core.TrackedOrder
 import com.didrikquant.core.roundToTick
+import com.didrikquant.orderstate.OrderSnapshot
+import com.didrikquant.orderstate.Side
 import java.math.BigDecimal
 import java.math.RoundingMode
 
@@ -20,7 +20,7 @@ public class SimpleMarketMaker(
     override fun onBookSnapshot(
         book: OrderBookSnapshot,
         position: BigDecimal,
-        openOrders: List<TrackedOrder>,
+        openOrders: List<OrderSnapshot>,
     ): List<StrategyAction> {
         if (!book.isValid()) return emptyList()
 

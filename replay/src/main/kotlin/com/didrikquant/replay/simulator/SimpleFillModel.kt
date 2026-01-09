@@ -1,7 +1,7 @@
 package com.didrikquant.replay.simulator
 
 import com.didrikquant.core.OrderBook
-import com.didrikquant.core.Side
+import com.didrikquant.orderstate.Side
 
 public class SimpleFillModel {
 

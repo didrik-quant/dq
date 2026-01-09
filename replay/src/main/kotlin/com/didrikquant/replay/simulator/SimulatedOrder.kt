@@ -1,6 +1,6 @@
 package com.didrikquant.replay.simulator
 
-import com.didrikquant.core.Side
+import com.didrikquant.orderstate.Side
 import java.math.BigDecimal
 
 public data class SimulatedOrder(

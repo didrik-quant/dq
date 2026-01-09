@@ -3,7 +3,7 @@ package com.didrikquant.replay.storage
 import com.didrikquant.core.ConnectionType
 import com.didrikquant.core.Event
 import com.didrikquant.core.PriceLevel
-import com.didrikquant.core.Side
+import com.didrikquant.orderstate.Side
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json

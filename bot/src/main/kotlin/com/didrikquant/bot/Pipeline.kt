@@ -5,16 +5,12 @@ import com.didrikquant.bot.handlers.CleanupHandler
 import com.didrikquant.bot.handlers.CommandOutputHandler
 import com.didrikquant.bot.handlers.DryRunOutputHandler
 import com.didrikquant.bot.handlers.EpochGuardHandler
-import com.didrikquant.bot.handlers.ExecutionStateHandler
-import com.didrikquant.bot.handlers.ExecutionUpdateHandler
 import com.didrikquant.bot.handlers.MonitoringHandler
 import com.didrikquant.bot.handlers.OutputHandler
-import com.didrikquant.bot.handlers.RiskHandler
-import com.didrikquant.bot.handlers.StrategyHandler
+import com.didrikquant.bot.handlers.TradingHandler
 import com.didrikquant.core.OrderBook
 import com.didrikquant.core.disruptor.DisruptorConfig
 import com.didrikquant.core.disruptor.MutableEvent
-import com.didrikquant.execution.OrderManager
 import com.didrikquant.kraken.KrakenRestClient
 import com.didrikquant.replay.recorder.EventRecorder
 import com.didrikquant.replay.recorder.RecorderConfig
@@ -31,7 +27,6 @@ public class Pipeline(
     private val config: BotConfig,
 ) {
     private val orderBook = OrderBook(config.symbol)
-    private val orderManager = OrderManager(config.symbol)
     private val strategy: Strategy = createStrategy(config)
     private val riskChecker = RiskChecker(config.riskConfig)
 
@@ -41,8 +36,7 @@ public class Pipeline(
 
     /**
      * Start the pipeline with the new handler chain:
-     * ExecutionStateHandler -> BookHandler -> StrategyHandler -> RiskHandler ->
-     * OutputHandler -> ExecutionUpdateHandler -> EpochGuardHandler -> MonitoringHandler -> CleanupHandler
+     * BookHandler -> TradingHandler -> OutputHandler -> EpochGuardHandler -> MonitoringHandler -> CleanupHandler
      */
     public fun start(
         recorderConfig: RecorderConfig? = null,
@@ -50,26 +44,26 @@ public class Pipeline(
     ): Disruptor<MutableEvent> {
         commandSender = CommandSender(restClient, config.symbol)
 
-        val executionStateHandler = ExecutionStateHandler(orderManager, config.riskConfig.maxLossUsd)
         val bookHandler = BookHandler(orderBook)
-        val strategyHandler = StrategyHandler(strategy, config.requoteIntervalMs)
-        val riskHandler = RiskHandler(riskChecker, config.symbol)
+        val tradingHandler = TradingHandler(
+            strategy = strategy,
+            riskChecker = riskChecker,
+            symbol = config.symbol,
+            requoteIntervalMs = config.requoteIntervalMs,
+            maxLossUsd = config.riskConfig.maxLossUsd,
+        )
         val outputHandler: CommandOutputHandler = if (config.dryRun) {
             DryRunOutputHandler()
         } else {
             OutputHandler(commandSender!!)
         }
-        val executionUpdateHandler = ExecutionUpdateHandler(orderManager)
         val epochGuardHandler = EpochGuardHandler(config.epochTradeCount, config.epochMaxDurationMs)
         val monitoringHandler = MonitoringHandler(logEveryNEvents = 1000)
 
         val handlers = mutableListOf(
-            executionStateHandler,
             bookHandler,
-            strategyHandler,
-            riskHandler,
+            tradingHandler,
             outputHandler,
-            executionUpdateHandler,
             epochGuardHandler,
             monitoringHandler,
         )

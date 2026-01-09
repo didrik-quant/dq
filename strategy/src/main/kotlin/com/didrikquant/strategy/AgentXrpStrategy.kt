@@ -2,10 +2,10 @@ package com.didrikquant.strategy
 
 import com.didrikquant.core.OrderBookSnapshot
 import com.didrikquant.core.OrderIntent
-import com.didrikquant.core.Side
 import com.didrikquant.core.StrategyAction
-import com.didrikquant.core.TrackedOrder
 import com.didrikquant.core.roundToTick
+import com.didrikquant.orderstate.OrderSnapshot
+import com.didrikquant.orderstate.Side
 import mu.KotlinLogging
 import java.math.BigDecimal
 import java.math.RoundingMode
@@ -30,7 +30,7 @@ public class AgentXrpStrategy(
     override fun onBookSnapshot(
         book: OrderBookSnapshot,
         position: BigDecimal,
-        openOrders: List<TrackedOrder>,
+        openOrders: List<OrderSnapshot>,
     ): List<StrategyAction> {
         if (!book.isValid()) return emptyList()
 
@@ -94,7 +94,7 @@ public class AgentXrpStrategy(
     }
 
     private fun manageOrder(
-        existing: TrackedOrder?,
+        existing: OrderSnapshot?,
         side: Side,
         targetPrice: BigDecimal,
         targetSize: BigDecimal,
@@ -106,19 +106,19 @@ public class AgentXrpStrategy(
         }
 
         if (isOrderCrossed(existing, mid)) {
-            logger.info { "$side: CANCEL crossed order ${existing.price} vs mid $mid" }
+            logger.info { "$side: CANCEL crossed order ${existing.currentPrice} vs mid $mid" }
             return listOf(StrategyAction.Cancel(existing.clOrdId))
         }
 
-        if (existing.isPartiallyFilled()) {
+        if (existing.hasFills) {
             logger.debug { "$side: holding partially filled order" }
             return emptyList()
         }
 
-        val driftBps = priceDriftBps(existing.price, targetPrice, mid)
+        val driftBps = priceDriftBps(existing.currentPrice, targetPrice, mid)
 
         if (driftBps > amendThresholdBps) {
-            logger.info { "$side: AMEND ${existing.price} -> $targetPrice (${driftBps}bps drift)" }
+            logger.info { "$side: AMEND ${existing.currentPrice} -> $targetPrice (${driftBps}bps drift)" }
             return listOf(StrategyAction.Amend(existing.clOrdId, targetPrice))
         }
 
@@ -126,12 +126,12 @@ public class AgentXrpStrategy(
     }
 
     private fun isOrderCrossed(
-        order: TrackedOrder,
+        order: OrderSnapshot,
         mid: BigDecimal,
     ): Boolean =
         when (order.side) {
-            Side.BUY -> order.price >= mid
-            Side.SELL -> order.price <= mid
+            Side.BUY -> order.currentPrice >= mid
+            Side.SELL -> order.currentPrice <= mid
         }
 
     private fun priceDriftBps(

@@ -2,6 +2,7 @@ package com.didrikquant.kraken
 
 import com.didrikquant.core.*
 import com.didrikquant.core.disruptor.MutableEvent
+import com.didrikquant.orderstate.Side
 import com.didrikquant.kraken.model.*
 import com.lmax.disruptor.RingBuffer
 import io.ktor.client.*

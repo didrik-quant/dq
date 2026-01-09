@@ -1,5 +1,6 @@
 package com.didrikquant.core
 
+import com.didrikquant.orderstate.Side
 import java.math.BigDecimal
 
 public sealed class Command {

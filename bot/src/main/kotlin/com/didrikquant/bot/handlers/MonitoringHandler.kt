@@ -21,12 +21,12 @@ public class MonitoringHandler(
         if (count % logEveryNEvents != 0L) return
 
         val book = event.orderBookSnapshot
-        val exec = event.executionSnapshot
+        val pos = event.positionSnapshot
 
         logger.info {
             "Status[$count]: mid=${book?.midPrice}, spread=${book?.spreadBps}bps, " +
-                "position=${exec?.position}, pnl=${exec?.realizedPnl}, " +
-                "openOrders=${exec?.openOrderCount}"
+                "position=${pos?.position}, pnl=${pos?.realizedPnl}, " +
+                "openOrders=${event.openOrders.size}"
         }
     }
 }
