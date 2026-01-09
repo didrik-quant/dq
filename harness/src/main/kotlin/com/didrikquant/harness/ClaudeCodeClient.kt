@@ -37,9 +37,27 @@ public class ClaudeCodeClient {
             .start()
 
         val outputThread = Thread {
-            process.inputStream.bufferedReader().forEachLine { line ->
-                parseAndLogEvent(line)
+            logger.debug { "Output reader thread started" }
+            try {
+                val reader = java.io.InputStreamReader(process.inputStream)
+                val sb = StringBuilder()
+                var ch: Int
+                while (reader.read().also { ch = it } != -1) {
+                    if (ch == '\n'.code) {
+                        val line = sb.toString()
+                        sb.clear()
+                        parseAndLogEvent(line)
+                    } else {
+                        sb.append(ch.toChar())
+                    }
+                }
+                if (sb.isNotEmpty()) {
+                    parseAndLogEvent(sb.toString())
+                }
+            } catch (e: Exception) {
+                logger.error(e) { "Error reading Claude output" }
             }
+            logger.debug { "Output reader thread finished" }
         }.apply {
             isDaemon = true
             name = "claude-output-reader"
