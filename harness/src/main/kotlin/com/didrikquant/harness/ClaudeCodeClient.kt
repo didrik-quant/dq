@@ -1,7 +1,6 @@
 package com.didrikquant.harness
 
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -20,6 +19,7 @@ public class ClaudeCodeClient {
     public fun runPrompt(workingDirectory: Path, prompt: String) {
         writeSettings(workingDirectory)
 
+        logger.info { "Starting Claude process..." }
         val process = ProcessBuilder(
             claudePath,
             "--model",
@@ -28,7 +28,9 @@ public class ClaudeCodeClient {
             prompt,
             "--output-format",
             "stream-json",
-            "--verbose"
+            "--verbose",
+            "--permission-mode",
+            "bypassPermissions"
         )
             .directory(workingDirectory.toFile())
             .redirectErrorStream(true)
