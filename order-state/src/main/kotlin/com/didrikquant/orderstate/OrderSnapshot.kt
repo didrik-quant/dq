@@ -43,6 +43,7 @@ public data class OrderSnapshot(
         return when (event) {
             is OrderStateEvent.ExecutionReport.PendingNew -> applyPendingNew(event)
             is OrderStateEvent.ExecutionReport.Accepted -> applyAccepted(event)
+            is OrderStateEvent.ExecutionReport.Trade -> applyTrade(event)
             is OrderStateEvent.ExecutionReport.PartialFill -> applyPartialFill(event)
             is OrderStateEvent.ExecutionReport.Filled -> applyFilled(event)
             is OrderStateEvent.ExecutionReport.Canceled -> applyCanceled(event)
@@ -137,6 +138,12 @@ public data class OrderSnapshot(
         } else {
             TransitionResult.Success(newSnapshot)
         }
+    }
+
+    @Suppress("UNUSED_PARAMETER")
+    private fun applyTrade(event: OrderStateEvent.ExecutionReport.Trade): TransitionResult {
+        // TODO: Implement in Task 2 - Trade handling with computed quantities
+        return TransitionResult.Invalid("Trade event handling not yet implemented")
     }
 
     private fun applyCanceled(event: OrderStateEvent.ExecutionReport.Canceled): TransitionResult {

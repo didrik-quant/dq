@@ -528,6 +528,7 @@ internal fun OrderStateEvent.withClOrdId(newClOrdId: String): OrderStateEvent = 
     is OrderStateEvent.Instruction.Amend -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.PendingNew -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.Accepted -> copy(clOrdId = newClOrdId)
+    is OrderStateEvent.ExecutionReport.Trade -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.PartialFill -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.Filled -> copy(clOrdId = newClOrdId)
     is OrderStateEvent.ExecutionReport.Canceled -> copy(clOrdId = newClOrdId)
