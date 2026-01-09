@@ -2,6 +2,7 @@ package com.didrikquant.kraken
 
 import com.didrikquant.core.*
 import com.didrikquant.core.disruptor.MutableEvent
+import com.didrikquant.orderstate.OrderStateEvent
 import com.didrikquant.orderstate.Side
 import com.didrikquant.kraken.model.*
 import com.lmax.disruptor.RingBuffer
@@ -229,8 +230,8 @@ public class KrakenPrivateWs(
         } else {
             val error = response["error"]?.jsonPrimitive?.contentOrNull ?: "Unknown error"
             logger.error { "Order rejected: $error" }
-            publishEvent(
-                Event.OrderRejected(
+            publishOrderEvent(
+                OrderStateEvent.ExecutionReport.Rejected.beforeAcceptance(
                     clOrdId = cmd.clOrdId,
                     reason = error,
                     timestamp = System.currentTimeMillis(),
@@ -244,10 +245,10 @@ public class KrakenPrivateWs(
         val result = response["result"]?.jsonPrimitive?.contentOrNull
         if (result == "success") {
             logger.info { "Order canceled: ${cmd.clOrdId}" }
-            publishEvent(
-                Event.OrderCanceled(
-                    orderId = "",
+            publishOrderEvent(
+                OrderStateEvent.ExecutionReport.Canceled(
                     clOrdId = cmd.clOrdId,
+                    orderId = "",
                     reason = "user_requested",
                     timestamp = System.currentTimeMillis(),
                 ),
@@ -279,11 +280,11 @@ public class KrakenPrivateWs(
             val editStatus = response["editStatus"]?.jsonObject
             val newOrderId = editStatus?.get("orderId")?.jsonPrimitive?.contentOrNull ?: ""
             logger.info { "Order amended: ${cmd.clOrdId} -> $newOrderId, price=${cmd.newPrice}" }
-            publishEvent(
-                Event.OrderAmended(
-                    oldOrderId = "",
-                    newOrderId = newOrderId,
+            publishOrderEvent(
+                OrderStateEvent.ExecutionReport.Amended(
                     clOrdId = cmd.clOrdId,
+                    orderId = newOrderId,
+                    previousOrderId = "",
                     newPrice = cmd.newPrice,
                     newQty = cmd.newQty,
                     timestamp = System.currentTimeMillis(),
@@ -329,7 +330,6 @@ public class KrakenPrivateWs(
 
         for (fill in fills) {
             val f = fill.jsonObject
-            val instrument = f["instrument"]?.jsonPrimitive?.contentOrNull ?: continue
             val orderId = f["order_id"]?.jsonPrimitive?.contentOrNull ?: ""
             val cliOrdId = f["cli_ord_id"]?.jsonPrimitive?.contentOrNull ?: ""
             val fillId = f["fill_id"]?.jsonPrimitive?.contentOrNull ?: ""
@@ -338,17 +338,13 @@ public class KrakenPrivateWs(
             val isBuy = f["buy"]?.jsonPrimitive?.booleanOrNull ?: continue
             val time = f["time"]?.jsonPrimitive?.longOrNull ?: System.currentTimeMillis()
 
-            publishEvent(
-                Event.OrderFill(
-                    orderId = orderId,
+            publishOrderEvent(
+                OrderStateEvent.ExecutionReport.Trade(
                     clOrdId = cliOrdId,
+                    orderId = orderId,
                     execId = fillId,
-                    symbol = instrument,
-                    side = if (isBuy) Side.BUY else Side.SELL,
                     fillQty = BigDecimal.valueOf(qty),
                     fillPrice = BigDecimal.valueOf(price),
-                    cumQty = BigDecimal.valueOf(qty),
-                    leavesQty = BigDecimal.ZERO,
                     timestamp = time,
                 ),
             )
@@ -361,7 +357,6 @@ public class KrakenPrivateWs(
 
         for (order in orders) {
             val o = order.jsonObject
-            val instrument = o["instrument"]?.jsonPrimitive?.contentOrNull ?: continue
             val orderId = o["order_id"]?.jsonPrimitive?.contentOrNull ?: continue
             val cliOrdId = o["cli_ord_id"]?.jsonPrimitive?.contentOrNull ?: ""
             val limitPrice = o["limit_price"]?.jsonPrimitive?.doubleOrNull ?: 0.0
@@ -369,11 +364,10 @@ public class KrakenPrivateWs(
             val direction = o["direction"]?.jsonPrimitive?.intOrNull ?: 0
             val time = o["time"]?.jsonPrimitive?.longOrNull ?: System.currentTimeMillis()
 
-            publishEvent(
-                Event.OrderAccepted(
-                    orderId = orderId,
+            publishOrderEvent(
+                OrderStateEvent.ExecutionReport.Accepted(
                     clOrdId = cliOrdId,
-                    symbol = instrument,
+                    orderId = orderId,
                     side = if (direction > 0) Side.BUY else Side.SELL,
                     price = BigDecimal.valueOf(limitPrice),
                     qty = BigDecimal.valueOf(qty),
@@ -404,6 +398,17 @@ public class KrakenPrivateWs(
             val mutableEvent = ringBuffer[sequence]
             mutableEvent.clear()
             mutableEvent.event = event
+        } finally {
+            ringBuffer.publish(sequence)
+        }
+    }
+
+    private fun publishOrderEvent(orderEvent: OrderStateEvent) {
+        val sequence = ringBuffer.next()
+        try {
+            val mutableEvent = ringBuffer[sequence]
+            mutableEvent.clear()
+            mutableEvent.orderEvent = orderEvent
         } finally {
             ringBuffer.publish(sequence)
         }
