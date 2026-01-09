@@ -92,7 +92,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
         }
     }
 
-    test("leavesQty equals currentQty minus filledQty") {
+    test("remainingQty equals currentQty minus filledQty") {
         checkAll(OrderStateArbs.validEventSequence()) { events ->
             var snapshot = OrderSnapshot.fromInstruction(
                 events.first() as OrderStateEvent.Instruction.Create,
@@ -102,7 +102,7 @@ internal class OrderSnapshotPropertyTests : FunSpec({
                 val result = snapshot.apply(event)
                 if (result is TransitionResult.Success) {
                     snapshot = result.snapshot
-                    snapshot.leavesQty shouldBe (snapshot.currentQty - snapshot.filledQty)
+                    snapshot.remainingQty shouldBe (snapshot.currentQty - snapshot.filledQty)
                 }
             }
         }

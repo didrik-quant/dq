@@ -39,7 +39,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
         snapshot.clOrdId shouldBe "order-001"
         snapshot.orderId shouldBe ""
         snapshot.filledQty shouldBe BigDecimal.ZERO
-        snapshot.leavesQty shouldBe BigDecimal("10.00")
+        snapshot.remainingQty shouldBe BigDecimal("10.00")
 
         // Accept order
         val accepted = OrderStateEvent.ExecutionReport.Accepted(
@@ -74,7 +74,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
 
         snapshot.state shouldBe OrderState.PARTIALLY_FILLED
         snapshot.filledQty shouldBe BigDecimal("3.00")
-        snapshot.leavesQty shouldBe BigDecimal("7.00")
+        snapshot.remainingQty shouldBe BigDecimal("7.00")
         snapshot.avgFillPrice shouldBe BigDecimal("99.50")
 
         // Final fill
@@ -93,7 +93,7 @@ internal class OrderSnapshotExampleTests : FunSpec({
 
         snapshot.state shouldBe OrderState.FILLED
         snapshot.filledQty shouldBe BigDecimal("10.00")
-        snapshot.leavesQty shouldBeNumerically BigDecimal.ZERO
+        snapshot.remainingQty shouldBeNumerically BigDecimal.ZERO
         snapshot.isTerminal shouldBe true
     }
 

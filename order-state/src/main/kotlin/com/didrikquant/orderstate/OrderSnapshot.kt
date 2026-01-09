@@ -17,7 +17,7 @@ public data class OrderSnapshot(
     val lastUpdateTimestamp: Long,
     val appliedExecIds: Set<String> = emptySet(),
 ) {
-    val leavesQty: BigDecimal
+    val remainingQty: BigDecimal
         get() = currentQty - filledQty
 
     val hasFills: Boolean
