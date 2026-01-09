@@ -50,94 +50,50 @@ public class TradingHandler(
     }
 
     private fun processOrderEvents(event: MutableEvent) {
-        when (val e = event.event) {
-            is Event.OrderAccepted -> {
-                val orderEvent = OrderStateEvent.ExecutionReport.Accepted(
-                    clOrdId = e.clOrdId,
-                    orderId = e.orderId,
-                    side = e.side,
-                    price = e.price,
-                    qty = e.qty,
-                    timestamp = e.timestamp,
-                )
-                applyOrderEvent(orderEvent)
-                logger.info { "Order accepted: ${e.orderId} (${e.clOrdId})" }
-            }
-            is Event.OrderFill -> {
-                val isFilled = e.leavesQty <= BigDecimal.ZERO
-                val orderEvent = if (isFilled) {
-                    OrderStateEvent.ExecutionReport.Filled(
-                        clOrdId = e.clOrdId,
-                        orderId = e.orderId,
-                        execId = e.execId,
-                        fillQty = e.fillQty,
-                        fillPrice = e.fillPrice,
-                        cumQty = e.cumQty,
-                        timestamp = e.timestamp,
-                    )
-                } else {
-                    OrderStateEvent.ExecutionReport.PartialFill(
-                        clOrdId = e.clOrdId,
-                        orderId = e.orderId,
-                        execId = e.execId,
-                        fillQty = e.fillQty,
-                        fillPrice = e.fillPrice,
-                        cumQty = e.cumQty,
-                        leavesQty = e.leavesQty,
-                        timestamp = e.timestamp,
-                    )
-                }
-                applyOrderEvent(orderEvent)
-                positionTracker.onFill(e.side, e.fillQty, e.fillPrice)
-                logger.info {
-                    "Fill: ${e.fillQty} @ ${e.fillPrice}, position=${positionTracker.getPosition()}, " +
-                        "pnl=${positionTracker.getRealizedPnl()}"
-                }
-            }
-            is Event.OrderCanceled -> {
-                val orderEvent = OrderStateEvent.ExecutionReport.Canceled(
-                    clOrdId = e.clOrdId,
-                    orderId = e.orderId,
-                    reason = e.reason,
-                    timestamp = e.timestamp,
-                )
-                applyOrderEvent(orderEvent)
-                logger.info { "Order canceled: ${e.orderId} - ${e.reason}" }
-            }
-            is Event.OrderAmended -> {
-                val orderEvent = OrderStateEvent.ExecutionReport.Amended(
-                    clOrdId = e.clOrdId,
-                    orderId = e.newOrderId,
-                    previousOrderId = e.oldOrderId,
-                    newPrice = e.newPrice,
-                    newQty = e.newQty,
-                    timestamp = e.timestamp,
-                )
-                applyOrderEvent(orderEvent)
-                logger.info { "Order amended: ${e.oldOrderId} -> ${e.newOrderId} @ ${e.newPrice}" }
-            }
-            is Event.OrderRejected -> {
-                throw BotFatalException("Order rejected: ${e.clOrdId} - ${e.reason}")
-            }
-            else -> {}
-        }
-    }
+        val orderEvent = event.orderEvent as? OrderStateEvent.ExecutionReport ?: return
 
-    private fun applyOrderEvent(orderEvent: OrderStateEvent.ExecutionReport) {
         when (val result = orderStore.apply(orderEvent)) {
-            is ApplyResult.Success -> {}
+            is ApplyResult.Success -> handleSuccessfulOrderEvent(orderEvent)
             is ApplyResult.SuccessWithWarning -> {
                 logger.warn { "Order event warning: ${result.warning}" }
-            }
-            is ApplyResult.OrderNotFound -> {
-                logger.warn { "Order not found: ${result.clOrdId}" }
-            }
-            is ApplyResult.InvalidTransition -> {
-                logger.error { "Invalid order transition: ${result.reason}" }
+                handleSuccessfulOrderEvent(orderEvent)
             }
             is ApplyResult.DuplicateExecution -> {
                 logger.debug { "Duplicate execution: ${result.execId}" }
             }
+            is ApplyResult.OrderNotFound -> {
+                throw BotFatalException("Order not found: ${result.clOrdId}")
+            }
+            is ApplyResult.InvalidTransition -> {
+                throw BotFatalException("Invalid order transition: ${result.reason}")
+            }
+        }
+    }
+
+    private fun handleSuccessfulOrderEvent(orderEvent: OrderStateEvent.ExecutionReport) {
+        when (orderEvent) {
+            is OrderStateEvent.ExecutionReport.Trade -> {
+                val snapshot = orderStore.get(orderEvent.clOrdId)
+                    ?: throw BotFatalException("Order disappeared after successful apply: ${orderEvent.clOrdId}")
+                positionTracker.onFill(snapshot.side, orderEvent.fillQty, orderEvent.fillPrice)
+                logger.info {
+                    "Fill: ${orderEvent.fillQty} @ ${orderEvent.fillPrice}, " +
+                        "position=${positionTracker.getPosition()}, pnl=${positionTracker.getRealizedPnl()}"
+                }
+            }
+            is OrderStateEvent.ExecutionReport.Accepted -> {
+                logger.info { "Order accepted: ${orderEvent.orderId} (${orderEvent.clOrdId})" }
+            }
+            is OrderStateEvent.ExecutionReport.Canceled -> {
+                logger.info { "Order canceled: ${orderEvent.orderId} - ${orderEvent.reason}" }
+            }
+            is OrderStateEvent.ExecutionReport.Amended -> {
+                logger.info { "Order amended: ${orderEvent.previousOrderId} -> ${orderEvent.orderId}" }
+            }
+            is OrderStateEvent.ExecutionReport.Rejected -> {
+                throw BotFatalException("Order rejected: ${orderEvent.clOrdId} - ${orderEvent.reason}")
+            }
+            else -> {}
         }
     }
 
