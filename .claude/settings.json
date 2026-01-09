@@ -1,10 +1,11 @@
 {
-  "enabledPlugins": {
-    "superpowers@superpowers-marketplace": true
-  },
   "permissions": {
     "allow": [
       "Read(/Users/diz/.claude/plugins/cache/superpowers-marketplace/superpowers/*/skills/**)"
     ]
+  },
+  "enabledPlugins": {
+    "superpowers@superpowers-marketplace": true,
+    "kotlin-lsp@claude-plugins-official": true
   }
 }
