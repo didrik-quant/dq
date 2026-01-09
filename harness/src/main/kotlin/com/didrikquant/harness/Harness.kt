@@ -243,6 +243,13 @@ public class Harness(private val config: HarnessConfig) {
     private fun runBot(worktreePath: Path, bazelBinPath: String, epoch: Int): BotResult {
         logger.info { "Running bot for ${config.epochTradeCount} trades (max ${config.epochMaxDurationMs}ms)" }
 
+        // Create per-epoch log file
+        val logDir = config.agentDir.resolve("logs")
+        Files.createDirectories(logDir)
+        val logFile = logDir.resolve("epoch-$epoch.log")
+        val logWriter = Files.newBufferedWriter(logFile)
+        logger.info { "Writing bot log to $logFile" }
+
         // Run the bot launcher directly instead of via `bazel run` to ensure
         // clean process exit propagation. The bot was already built by build().
         val botLauncher = "$bazelBinPath/bot/bot"
