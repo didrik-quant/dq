@@ -105,7 +105,7 @@ public class KrakenPrivateWs(
     private suspend fun WebSocketSession.requestChallenge() {
         val request = WsChallengeRequest(apiKey = config.apiKey)
         val requestJson = json.encodeToString(request)
-        logger.debug { "Sending challenge request: $requestJson" }
+        logger.trace { "Sending challenge request: $requestJson" }
         send(requestJson)
         logger.info { "Requested challenge" }
     }
@@ -115,7 +115,7 @@ public class KrakenPrivateWs(
             for (frame in incoming) {
                 if (frame is Frame.Text) {
                     val text = frame.readText()
-                    logger.debug { "Private WS received: $text" }
+                    logger.trace { "Private WS received: $text" }
                     val obj = json.parseToJsonElement(text).jsonObject
                     val event = obj["event"]?.jsonPrimitive?.contentOrNull
 
@@ -147,7 +147,7 @@ public class KrakenPrivateWs(
                 signedChallenge = signedChallenge,
             )
             val requestJson = json.encodeToString(request)
-            logger.debug { "Sending subscribe request: $requestJson" }
+            logger.trace { "Sending subscribe request: $requestJson" }
             send(requestJson)
             logger.info { "Subscribing to $feed" }
         }
@@ -158,7 +158,7 @@ public class KrakenPrivateWs(
             for (frame in incoming) {
                 if (frame is Frame.Text) {
                     val text = frame.readText()
-                    logger.debug { "Private WS received: $text" }
+                    logger.trace { "Private WS received: $text" }
                     val obj = json.parseToJsonElement(text).jsonObject
                     val event = obj["event"]?.jsonPrimitive?.contentOrNull
 
@@ -188,7 +188,7 @@ public class KrakenPrivateWs(
             when (frame) {
                 is Frame.Text -> {
                     val text = frame.readText()
-                    logger.debug { "Private WS received: $text" }
+                    logger.trace { "Private WS received: $text" }
                     processMessage(text)
                 }
                 is Frame.Ping -> send(Frame.Pong(frame.data))
@@ -384,7 +384,7 @@ public class KrakenPrivateWs(
             val instrument = p["instrument"]?.jsonPrimitive?.contentOrNull ?: continue
             val balance = p["balance"]?.jsonPrimitive?.doubleOrNull ?: 0.0
             val pnl = p["pnl"]?.jsonPrimitive?.doubleOrNull ?: 0.0
-            logger.debug { "Position: $instrument balance=$balance pnl=$pnl" }
+            logger.trace { "Position: $instrument balance=$balance pnl=$pnl" }
         }
     }
 
