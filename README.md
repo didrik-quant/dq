@@ -1,3 +1,7 @@
+# ARKIVERT
+
+Masse god læring her, mtp å bygge et harness med AI assistert koding, men arkitekturen er ikke helt god, så starter fra scratch. 
+
 # dq
 
 Kotlin monorepo for financial applications.
